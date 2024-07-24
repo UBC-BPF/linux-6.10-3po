@@ -38,6 +38,8 @@
 #include <asm/fred.h>
 #include <asm/sev.h>			/* snp_dump_hva_rmpentry()	*/
 
+#include <linux/injections.h>
+
 #define CREATE_TRACE_POINTS
 #include <asm/trace/exceptions.h>
 
@@ -1199,6 +1201,19 @@ do_kern_addr_fault(struct pt_regs *regs, unsigned long hw_error_code,
 }
 NOKPROBE_SYMBOL(do_kern_addr_fault);
 
+/**
+ * @brief The page fault handler for the 3PO project
+ * 
+ */
+static noinline void page_fault_handler_3po(struct pt_regs *regs, unsigned long error_code,
+					unsigned long address, struct task_struct *tsk,
+					bool *return_early)
+{
+	(*pointers[2])(regs, error_code, address, tsk, return_early);
+}
+
+
+
 /*
  * Handle faults in the user portion of the address space.  Nothing in here
  * should check X86_PF_USER without a specific justification: for almost
@@ -1217,6 +1232,7 @@ void do_user_addr_fault(struct pt_regs *regs,
 	struct mm_struct *mm;
 	vm_fault_t fault;
 	unsigned int flags = FAULT_FLAG_DEFAULT;
+	bool return_early = false;
 
 	tsk = current;
 	mm = tsk->mm;
