@@ -47,6 +47,8 @@
 #include <linux/uidgid_types.h>
 #include <asm/kmap_size.h>
 
+#include <linux/task_struct_oblivious.h>
+
 /* task_struct member predeclarations (sorted alphabetically): */
 struct audit_context;
 struct bio_list;
@@ -1553,7 +1555,7 @@ struct task_struct {
 #ifdef CONFIG_USER_EVENTS
 	struct user_event_mm		*user_event_mm;
 #endif
-
+	struct task_struct_oblivious    obl;
 	/*
 	 * New fields for task_struct should be added above here, so that
 	 * they are included in the randomized portion of task_struct.
