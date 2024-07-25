@@ -103,6 +103,7 @@
 #include <linux/rseq.h>
 #include <uapi/linux/pidfd.h>
 #include <linux/pidfs.h>
+#include <linux/injections.h>
 
 #include <asm/pgalloc.h>
 #include <linux/uaccess.h>
