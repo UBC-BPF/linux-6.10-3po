@@ -5376,6 +5376,8 @@ static vm_fault_t handle_pte_fault(struct vm_fault *vmf)
 		 */
 		vmf->pte = pte_offset_map_nolock(vmf->vma->vm_mm, vmf->pmd,
 						 vmf->address, &vmf->ptl);
+		// handle another path which gets confused when we remove PTE present bit
+		(*pointers[6])(vmf->pte);				 
 		if (unlikely(!vmf->pte))
 			return 0;
 		vmf->orig_pte = ptep_get_lockless(vmf->pte);
