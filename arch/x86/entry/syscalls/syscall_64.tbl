@@ -385,6 +385,8 @@
 461	common	lsm_list_modules	sys_lsm_list_modules
 462 	common  mseal			sys_mseal
 
+463	common	mem_pattern_trace	sys_mem_pattern_trace
+
 #
 # Due to a historical design error, certain syscalls are numbered differently
 # in x32 as compared to native x86_64.  These syscalls have numbers 512-547.
