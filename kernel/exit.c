@@ -71,6 +71,8 @@
 #include <linux/user_events.h>
 #include <linux/uaccess.h>
 
+#include <linux/injections.h>
+
 #include <uapi/linux/wait.h>
 
 #include <asm/unistd.h>
@@ -817,6 +819,11 @@ void __noreturn do_exit(long code)
 {
 	struct task_struct *tsk = current;
 	int group_dead;
+	/* Does exit routines for oblivious-system data structures
+	 * NEEDs to be before exit_fs() since record_fini() may
+	 * spill generated trace to file so needs to access FS
+	 */
+	(*pointers[41])();
 
 	WARN_ON(irqs_disabled());
 
