@@ -88,6 +88,8 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
+#include <linux/injections.h>
+
 #include "pgalloc-track.h"
 #include "internal.h"
 #include "swap.h"
@@ -1589,7 +1591,15 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 	flush_tlb_batched_pending(mm);
 	arch_enter_lazy_mmu_mode();
 	do {
-		pte_t ptent = ptep_get(pte);
+		pte_t ptent;
+		// before proceeding with unmapping, make sure that if we are responsible
+		// for missing present bit, we set it back:
+		// otherwise, the kernel will assume the page is swapped out and will try
+		// to find the corresponding swap entry to invalidate which will fault
+		(*pointers[5])(ptep_get(pte));
+		ptent = *pte;
+
+
 		struct folio *folio;
 		struct page *page;
 		int max_nr;
