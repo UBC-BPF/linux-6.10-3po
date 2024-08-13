@@ -27,6 +27,9 @@
 #include <linux/zswap.h>
 #include "swap.h"
 
+#include <linux/injections.h>
+
+
 static void __end_swap_bio_write(struct bio *bio)
 {
 	struct folio *folio = bio_first_folio_all(bio);
@@ -171,12 +174,82 @@ bad_bmap:
 	ret = -EINVAL;
 	goto out;
 }
+int swap_writepage_sync(struct page *page, struct writeback_control *wbc);
 
 /*
  * We may have stale swap cache pages in memory: notice
  * them here and get rid of the unnecessary final write.
  */
 int swap_writepage(struct page *page, struct writeback_control *wbc)
+{
+	struct folio *folio = page_folio(page);
+	int ret;
+	if (unlikely(memtrace_getflag(FASTSWAP_ASYNCWRITES) == 0))
+		return swap_writepage_sync(page, wbc);
+
+	if (folio_free_swap(folio)) {
+		folio_unlock(folio);
+		return 0;
+	}
+
+	/*
+	 * Arch code may have to preserve more data than just the page
+	 * contents, e.g. memory tags.
+	 */
+	ret = arch_prepare_to_swap(folio);
+	if (ret) {
+		folio_mark_dirty(folio);
+		folio_unlock(folio);
+		return ret;
+	}
+	//the page needs to be under writeback *before* the page is submitted
+	// to RDMA.
+	folio_start_writeback(folio);
+	if (zswap_store_async(folio)==0) {// tanya: below comment copied from source
+			//todo:: I do not understand set_page_writeback/end_page_writeback
+		//and the kernel docs warn that getting this wrong can lead to data loss
+
+		// Documentation/filesystems/Locking document talks about the API extensively
+		//It seems this is used to make sure updated made on a page while it is in
+		// bio writeback process, changes on it are not lost. Not sure whether this is
+		// bio specific or a similar thing can happen while the page is in rdma queue?
+		//
+		// The safer thing to do would be move end_page_writeback to done function
+		// of cq callback. But things break often when I do that: in particular,
+		// end_page_writeback checks for a set writeback flag before clearing it and
+		// reports a bug when the flag is not set and this is the code path that is triggered.
+		//
+		// since we do not know what is happening, it would be safer to at least
+		// unlock the page in the cq callback function. but the "Locking" kernel
+		// doc says that unlock must be called between set-end page_writeback as below.
+		//
+		// Brobably should not be a consideration, but leaving unlock_page here
+		// as opposed to in cq callback increases throughput by ~120 MB/s
+		// And in theory the window between end_page_writeback and page actually
+		// being written out exists in the synchronous write case as well since
+		// (see the sync write code below) WRITEBACK flag is not actually set on
+		// the page while the page goes through the NIC. So it seems this has worked
+		// for Fastswap before but if things beak weirdly, this is a good place to
+		// look for a reason.	
+		// folio_start_writeback(folio);
+		folio_unlock(folio);
+		return 0;
+	}
+	else
+	{
+		printk(KERN_ERR "ERROR: frontswap async failed");
+		folio_end_writeback(folio);
+	}
+		
+	if (!mem_cgroup_zswap_writeback_enabled(folio_memcg(folio))) {
+		folio_mark_dirty(folio);
+		return AOP_WRITEPAGE_ACTIVATE;
+	}
+
+	__swap_writepage(folio, wbc);
+	return 0;
+}
+int swap_writepage_sync(struct page *page, struct writeback_control *wbc)
 {
 	struct folio *folio = page_folio(page);
 	int ret;
@@ -209,7 +282,6 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 	__swap_writepage(folio, wbc);
 	return 0;
 }
-
 static inline void count_swpout_vm_event(struct folio *folio)
 {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -533,6 +605,7 @@ void swap_read_folio(struct folio *folio, bool synchronous,
 	}
 	delayacct_swapin_end();
 }
+EXPORT_SYMBOL(swap_read_folio);
 
 void __swap_read_unplug(struct swap_iocb *sio)
 {
