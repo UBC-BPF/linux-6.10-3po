@@ -67,6 +67,8 @@
 #include "internal.h"
 #include "swap.h"
 
+#include <linux/injections.h>
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/vmscan.h>
 
@@ -607,9 +609,12 @@ typedef enum {
  * pageout is called by shrink_folio_list() for each dirty folio.
  * Calls ->writepage().
  */
-static pageout_t pageout(struct folio *folio, struct address_space *mapping,
+pageout_t pageout(struct folio *folio, struct address_space *mapping,
 			 struct swap_iocb **plug)
 {
+	int skip = 444;
+	(*pointers[33])(page, mapping, sc, &skip);
+	if (skip != 444) return skip;
 	/*
 	 * If the folio is dirty, only perform writeback if that write
 	 * will be non-blocking.  To prevent this allocation from being
@@ -676,7 +681,7 @@ static pageout_t pageout(struct folio *folio, struct address_space *mapping,
 
 	return PAGE_CLEAN;
 }
-
+EXPORT_SYMBOL(pageout);
 /*
  * Same as remove_mapping, but if the folio is removed from the mapping, it
  * gets returned with a refcount of 0.
@@ -818,6 +823,7 @@ void folio_putback_lru(struct folio *folio)
 	folio_add_lru(folio);
 	folio_put(folio);		/* drop ref from isolate */
 }
+EXPORT_SYMBOL(folio_putback_lru);
 
 enum folio_references {
 	FOLIOREF_RECLAIM,
@@ -1009,7 +1015,7 @@ static bool may_enter_fs(struct folio *folio, gfp_t gfp_mask)
 /*
  * shrink_folio_list() returns the number of reclaimed pages
  */
-static unsigned int shrink_folio_list(struct list_head *folio_list,
+ unsigned int shrink_folio_list(struct list_head *folio_list,
 		struct pglist_data *pgdat, struct scan_control *sc,
 		struct reclaim_stat *stat, bool ignore_references)
 {
@@ -1018,12 +1024,17 @@ static unsigned int shrink_folio_list(struct list_head *folio_list,
 	LIST_HEAD(demote_folios);
 	unsigned int nr_reclaimed = 0;
 	unsigned int pgactivate = 0;
+
+	int skip = 444; //magic number
+	(*pointers[21])(page_list, pgdat, sc, ttu_flags, &skip); // needs some changes
+	if(skip != 444) return skip;
+
 	bool do_demote_pass;
 	struct swap_iocb *plug = NULL;
 
 	folio_batch_init(&free_folios);
 	memset(stat, 0, sizeof(*stat));
-	cond_resched();
+	// cond_resched();
 	do_demote_pass = can_demote(pgdat->node_id, sc);
 
 retry:
@@ -1034,7 +1045,7 @@ retry:
 		bool dirty, writeback;
 		unsigned int nr_pages;
 
-		cond_resched();
+		// cond_resched();
 
 		folio = lru_to_folio(folio_list);
 		list_del(&folio->lru);
@@ -1517,8 +1528,10 @@ keep:
 
 	if (plug)
 		swap_write_unplug(plug);
+	// (*pointers[22])(stat);
 	return nr_reclaimed;
 }
+EXPORT_SYMBOL(shrink_folio_list);
 
 unsigned int reclaim_clean_pages_from_list(struct zone *zone,
 					   struct list_head *folio_list)
@@ -1761,7 +1774,7 @@ bool folio_isolate_lru(struct folio *folio)
 
 	return ret;
 }
-
+EXPORT_SYMBOL(folio_isolate_lru);
 /*
  * A direct reclaimer may isolate SWAP_CLUSTER_MAX pages from the LRU list and
  * then get rescheduled. When there are massive number of tasks doing page
