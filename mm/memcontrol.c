@@ -73,6 +73,7 @@
 #include "swap.h"
 
 #include <linux/uaccess.h>
+#include <linux/injections.h>
 
 #include <trace/events/vmscan.h>
 
@@ -106,6 +107,8 @@ static bool do_memsw_account(void)
 
 #define THRESHOLDS_EVENTS_TARGET 128
 #define SOFTLIMIT_EVENTS_TARGET 1024
+
+#define FASTSWAP_RECLAIM_CPU	7
 
 /*
  * Cgroups above their limits are maintained in a RB-Tree, independent of
@@ -2618,7 +2621,7 @@ static int memcg_hotplug_cpu_dead(unsigned int cpu)
 	return 0;
 }
 
-static unsigned long reclaim_high(struct mem_cgroup *memcg,
+unsigned long reclaim_high(struct mem_cgroup *memcg,
 				  unsigned int nr_pages,
 				  gfp_t gfp_mask)
 {
@@ -2643,13 +2646,37 @@ static unsigned long reclaim_high(struct mem_cgroup *memcg,
 
 	return nr_reclaimed;
 }
+EXPORT_SYMBOL(reclaim_high);
 
+
+#define MAX_RECLAIM_OFFLOAD 2048UL
 static void high_work_func(struct work_struct *work)
 {
 	struct mem_cgroup *memcg;
+	bool skip;
+	// memcg = container_of(work, struct mem_cgroup, high_work);
+	// reclaim_high(memcg, MEMCG_CHARGE_BATCH, GFP_KERNEL);
+	struct mem_cgroup *memcg = container_of(work, struct mem_cgroup, high_work);
+	unsigned long high = memcg->high;
+	unsigned long nr_pages = page_counter_read(&memcg->memory);
+	unsigned long reclaim;
 
-	memcg = container_of(work, struct mem_cgroup, high_work);
-	reclaim_high(memcg, MEMCG_CHARGE_BATCH, GFP_KERNEL);
+	skip = false;
+
+	(*pointers[30])(work, memcg, high, nr_pages, &skip);
+	if (skip)
+		return;
+
+	if (nr_pages > high) {
+		reclaim = min(nr_pages - high, MAX_RECLAIM_OFFLOAD);
+
+		/* reclaim_high only reclaims iff nr_pages > high */
+		reclaim_high(memcg, reclaim, GFP_KERNEL);
+	}
+	if (page_counter_read(&memcg->memory) > memcg->high)
+		schedule_work_on(FASTSWAP_RECLAIM_CPU, &memcg->high_work);
+
+
 }
 
 /*
@@ -2900,6 +2927,9 @@ static int try_charge_memcg(struct mem_cgroup *memcg, gfp_t gfp_mask,
 	bool drained = false;
 	bool raised_max_event = false;
 	unsigned long pflags;
+	unsigned long high_limit;
+	unsigned long curr_pages;
+	unsigned long excess;
 
 retry:
 	if (consume_stock(memcg, nr_pages))
@@ -3037,21 +3067,36 @@ done_restock:
 	 * reclaim, the cost of mismatch is negligible.
 	 */
 	do {
+		bool skip;
 		bool mem_high, swap_high;
-
+		skip = false;
 		mem_high = page_counter_read(&memcg->memory) >
 			READ_ONCE(memcg->memory.high);
 		swap_high = page_counter_read(&memcg->swap) >
 			READ_ONCE(memcg->swap.high);
 
 		/* Don't bother a random interrupted task */
-		if (!in_task()) {
-			if (mem_high) {
-				schedule_work(&memcg->high_work);
-				break;
+		// if (!in_task()) {
+		// 	if (mem_high) {
+		// 		schedule_work(&memcg->high_work);
+		// 		break;
+		// 	}
+		// 	continue;
+		// }
+		high_limit = memcg->memory.high;
+		curr_pages = page_counter_read(&memcg->memory);
+		(*pointers[51])(memcg, &skip);
+		if (!skip && mem_high) {
+			excess = curr_pages - high_limit;
+			/* regardless of whether we use app cpu or worker, we evict
+			 * at most MAX_RECLAIM_OFFLOAD pages at a time */
+			if (excess > MAX_RECLAIM_OFFLOAD && !in_interrupt()) {
+				current->memcg_nr_pages_over_high += MAX_RECLAIM_OFFLOAD;
+				set_notify_resume(current);
+			} else {
+				schedule_work_on(FASTSWAP_RECLAIM_CPU, &memcg->high_work);
 			}
-			continue;
-		}
+		
 
 		if (mem_high || swap_high) {
 			/*
@@ -3063,8 +3108,8 @@ done_restock:
 			 * and distribute reclaim work and delay penalties
 			 * based on how much each task is actually allocating.
 			 */
-			current->memcg_nr_pages_over_high += batch;
-			set_notify_resume(current);
+			// current->memcg_nr_pages_over_high += batch;
+			// set_notify_resume(current);
 			break;
 		}
 	} while ((memcg = parent_mem_cgroup(memcg)));
@@ -6983,30 +7028,31 @@ static ssize_t memory_high_write(struct kernfs_open_file *of,
 
 	page_counter_set_high(&memcg->memory, high);
 
-	for (;;) {
-		unsigned long nr_pages = page_counter_read(&memcg->memory);
-		unsigned long reclaimed;
+	// for (;;) {
+	// 	unsigned long nr_pages = page_counter_read(&memcg->memory);
+	// 	unsigned long reclaimed;
 
-		if (nr_pages <= high)
-			break;
+	// 	if (nr_pages <= high)
+	// 		break;
 
-		if (signal_pending(current))
-			break;
+	// 	if (signal_pending(current))
+	// 		break;
 
-		if (!drained) {
-			drain_all_stock(memcg);
-			drained = true;
-			continue;
-		}
+	// 	if (!drained) {
+	// 		drain_all_stock(memcg);
+	// 		drained = true;
+	// 		continue;
+	// 	}
 
-		reclaimed = try_to_free_mem_cgroup_pages(memcg, nr_pages - high,
-					GFP_KERNEL, MEMCG_RECLAIM_MAY_SWAP);
+	// 	reclaimed = try_to_free_mem_cgroup_pages(memcg, nr_pages - high,
+	// 				GFP_KERNEL, MEMCG_RECLAIM_MAY_SWAP);
 
-		if (!reclaimed && !nr_retries--)
-			break;
-	}
+	// 	if (!reclaimed && !nr_retries--)
+	// 		break;
+	// }
 
 	memcg_wb_domain_size_changed(memcg);
+	schedule_work_on(FASTSWAP_RECLAIM_CPU, &memcg->high_work);
 	return nbytes;
 }
 
