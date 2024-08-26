@@ -9,7 +9,7 @@
 #include "common.h"
 #include <linux/injections.h>
 
-#include <linux/frontswap.h>
+// #include <linux/frontswap.h>
 #include <linux/pagemap.h>
 #define MAX_PRINT_LEN 768
 extern char fetch_print_buf[MAX_PRINT_LEN];
