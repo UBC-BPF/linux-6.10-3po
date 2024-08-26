@@ -11,6 +11,8 @@
 
 #include <linux/kallsyms.h>
 
+#include <stdbool.h>
+
 #define OBL_MAX_PRINT_LEN 768
 static const int FOOTSTEPPING_JUMP = 10;
 static const int SYNC_THRESHHOLD = 10;
@@ -122,7 +124,7 @@ static void prefetch_work_func(struct work_struct *work)
 	if (unlikely(!memtrace_getflag(TAPE_FETCH)))
 		return;
 
-	down_read(&tsk->mm->mmap_sem);
+	down_read(&tsk->mm->mmap_lock);
 
 	current_pos_idx = proc->key_page_indices[obl->tind];
 	if (fetch->prefetch_next_idx < current_pos_idx) {
@@ -159,7 +161,7 @@ static void prefetch_work_func(struct work_struct *work)
 			    tsk->mm);
 	fetch->key_page_idx = proc->key_page_indices[tsk->obl.tind]; // for debugging
 
-	up_read(&tsk->mm->mmap_sem);
+	up_read(&tsk->mm->mmap_lock);
 
 	#if COLLECT_STATS
 	{
