@@ -9,9 +9,9 @@
 #include <linux/swapops.h> //for swp_type
 #include <linux/rmap.h> // try_to_unmap
 #include <linux/kthread.h>
-
+#include <linux/printk.h>
 #include "ring_buffer.h"
-#include "page_buffer.h"
+// #include "page_buffer.h"
 
 typedef struct {
 	int counter;
@@ -84,22 +84,8 @@ bool evict(struct page *p)
 		mapping = page_mapping(p);
 	}
 
-	if (page_mapped(p) && mapping) {
-		switch (try_to_unmap(p, TTU_UNMAP /*| TTU_BATCH_FLUSH*/)) {
-		case SWAP_FAIL:
-			//printk(KERN_DEBUG "faailed to unmap page %px\n", p);
-			goto keep_locked;
-		case SWAP_AGAIN:
-			printk(KERN_DEBUG
-			       "faailed SWAP AGAIN to unmap page %px\n",
-			       p);
-			goto keep_locked;
-		case SWAP_MLOCK:
-			printk(KERN_DEBUG "faailed MLOCK to unmap page %px\n",
-			       p);
-			goto keep_locked;
-		case SWAP_SUCCESS: /* try to write dirty page and evict it*/;
-		}
+	if (page_mapped(p) && mapping) { 
+		try_to_unmap(p,TTU_BATCH_FLUSH); // might need some changes to flags
 	}
 
 	if (!PageLRU(p)) goto keep_locked;

@@ -1,6 +1,8 @@
 #ifndef FETCH_H
 #define FETCH_H
 
+#include <stdbool.h>
+
 void fetch_init(struct task_struct *tsk, int flags);
 bool fetch_initialized();
 void fetch_page_fault_handler(struct pt_regs *regs, unsigned long error_code,

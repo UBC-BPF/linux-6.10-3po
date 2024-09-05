@@ -89,6 +89,8 @@
 #include <asm/tlbflush.h>
 
 #include <linux/injections.h>
+#include <linux/delay.h> 
+#include <linux/zswap.h> 
 
 #include "pgalloc-track.h"
 #include "internal.h"
@@ -1596,7 +1598,7 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 		// for missing present bit, we set it back:
 		// otherwise, the kernel will assume the page is swapped out and will try
 		// to find the corresponding swap entry to invalidate which will fault
-		(*pointers[5])(ptep_get(pte));
+		(*pointers[5])(pte);
 		ptent = *pte;
 
 
@@ -3946,6 +3948,432 @@ static vm_fault_t handle_pte_marker(struct vm_fault *vmf)
 	return VM_FAULT_SIGBUS;
 }
 
+/**
+ * @brief 3po do_swap_page
+ * 
+ * 
+ * Modified version of do_swap_page used to prefault pages in 3PO. This is
+ * duplicated to avoid accidentally messing up the ftraced
+ * lock_page_or_retry_minor_page_fault function.
+ */
+
+vm_fault_t do_swap_page_prefault_3po(struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	struct folio *swapcache, *folio = NULL;
+	struct page *page;
+	struct swap_info_struct *si = NULL;
+	rmap_t rmap_flags = RMAP_NONE;
+	bool need_clear_cache = false;
+	bool exclusive = false;
+	swp_entry_t entry;
+	pte_t pte;
+	vm_fault_t ret = 0;
+	void *shadow = NULL;
+	int nr_pages;
+	unsigned long page_idx;
+	unsigned long address;
+	pte_t *ptep;
+
+	if (!pte_unmap_same(vmf))
+		goto out;
+
+	entry = pte_to_swp_entry(vmf->orig_pte);
+	if (unlikely(non_swap_entry(entry))) {
+		if (is_migration_entry(entry)) {
+			migration_entry_wait(vma->vm_mm, vmf->pmd,
+					     vmf->address);
+		} else if (is_device_exclusive_entry(entry)) {
+			vmf->page = pfn_swap_entry_to_page(entry);
+			ret = remove_device_exclusive_entry(vmf);
+		} else if (is_device_private_entry(entry)) {
+			if (vmf->flags & FAULT_FLAG_VMA_LOCK) {
+				/*
+				 * migrate_to_ram is not yet ready to operate
+				 * under VMA lock.
+				 */
+				vma_end_read(vma);
+				ret = VM_FAULT_RETRY;
+				goto out;
+			}
+
+			vmf->page = pfn_swap_entry_to_page(entry);
+			vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
+					vmf->address, &vmf->ptl);
+			if (unlikely(!vmf->pte ||
+				     !pte_same(ptep_get(vmf->pte),
+							vmf->orig_pte)))
+				goto unlock;
+
+			/*
+			 * Get a page reference while we know the page can't be
+			 * freed.
+			 */
+			get_page(vmf->page);
+			pte_unmap_unlock(vmf->pte, vmf->ptl);
+			ret = vmf->page->pgmap->ops->migrate_to_ram(vmf);
+			put_page(vmf->page);
+		} else if (is_hwpoison_entry(entry)) {
+			ret = VM_FAULT_HWPOISON;
+		} else if (is_pte_marker_entry(entry)) {
+			ret = handle_pte_marker(vmf);
+		} else {
+			print_bad_pte(vma, vmf->address, vmf->orig_pte, NULL);
+			ret = VM_FAULT_SIGBUS;
+		}
+		goto out;
+	}
+
+	/* Prevent swapoff from happening to us. */
+	si = get_swap_device(entry);
+	if (unlikely(!si))
+		goto out;
+
+	folio = swap_cache_get_folio(entry, vma, vmf->address);
+	if (folio)
+		page = folio_file_page(folio, swp_offset(entry));
+	swapcache = folio;
+
+	if (!folio) {
+		// if (data_race(si->flags & SWP_SYNCHRONOUS_IO) &&
+		//     __swap_count(entry) == 1) {
+		// 	/*
+		// 	 * Prevent parallel swapin from proceeding with
+		// 	 * the cache flag. Otherwise, another thread may
+		// 	 * finish swapin first, free the entry, and swapout
+		// 	 * reusing the same entry. It's undetectable as
+		// 	 * pte_same() returns true due to entry reuse.
+		// 	 */
+		// 	if (swapcache_prepare(entry)) {
+		// 		/* Relax a bit to prevent rapid repeated page faults */
+		// 		schedule_timeout_uninterruptible(1);
+		// 		goto out;
+		// 	}
+		// 	need_clear_cache = true;
+
+		// 	/* skip swapcache */
+		// 	folio = vma_alloc_folio(GFP_HIGHUSER_MOVABLE, 0,
+		// 				vma, vmf->address, false);
+		// 	page = &folio->page;
+		// 	if (folio) {
+		// 		__folio_set_locked(folio);
+		// 		__folio_set_swapbacked(folio);
+
+		// 		if (mem_cgroup_swapin_charge_folio(folio,
+		// 					vma->vm_mm, GFP_KERNEL,
+		// 					entry)) {
+		// 			ret = VM_FAULT_OOM;
+		// 			goto out_page;
+		// 		}
+		// 		mem_cgroup_swapin_uncharge_swap(entry);
+
+		// 		shadow = get_shadow_from_swap_cache(entry);
+		// 		if (shadow)
+		// 			workingset_refault(folio, shadow);
+
+		// 		folio_add_lru(folio);
+
+		// 		/* To provide entry to swap_read_folio() */
+		// 		folio->swap = entry;
+		// 		swap_read_folio(folio, NULL);
+		// 		folio->private = NULL;
+		// 	}
+		// } else {
+		// 	page = swapin_readahead(entry, GFP_HIGHUSER_MOVABLE,
+		// 				vmf);
+		// 	if (page)
+		// 		folio = page_folio(page);
+		// 	swapcache = folio;
+		// }
+
+		// if (!folio) {
+		// 	/*
+		// 	 * Back out if somebody else faulted in this pte
+		// 	 * while we released the pte lock.
+		// 	 */
+		// 	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
+		// 			vmf->address, &vmf->ptl);
+		// 	if (likely(vmf->pte &&
+		// 		   pte_same(ptep_get(vmf->pte), vmf->orig_pte)))
+		// 		ret = VM_FAULT_OOM;
+		// 	goto unlock;
+		// }
+
+		/* Had to read the page from swap area: Major fault */
+		ret = VM_FAULT_MAJOR;
+		goto out;
+		// count_vm_event(PGMAJFAULT);
+		// count_memcg_event_mm(vma->vm_mm, PGMAJFAULT);
+	} else if (PageHWPoison(page)) {
+		/*
+		 * hwpoisoned dirty swapcache pages are kept for killing
+		 * owner processes (which may be unknown at hwpoison time)
+		 */
+		ret = VM_FAULT_HWPOISON;
+		goto out_release;
+	}
+
+	ret |= folio_lock_or_retry(folio, vmf);
+	if (ret & VM_FAULT_RETRY)
+		goto out_release;
+
+	if (swapcache) {
+		/*
+		 * Make sure folio_free_swap() or swapoff did not release the
+		 * swapcache from under us.  The page pin, and pte_same test
+		 * below, are not enough to exclude that.  Even if it is still
+		 * swapcache, we need to check that the page's swap has not
+		 * changed.
+		 */
+		if (unlikely(!folio_test_swapcache(folio) ||
+			     page_swap_entry(page).val != entry.val))
+			goto out_page;
+
+		/*
+		 * KSM sometimes has to copy on read faults, for example, if
+		 * page->index of !PageKSM() pages would be nonlinear inside the
+		 * anon VMA -- PageKSM() is lost on actual swapout.
+		 */
+		folio = ksm_might_need_to_copy(folio, vma, vmf->address);
+		if (unlikely(!folio)) {
+			ret = VM_FAULT_OOM;
+			folio = swapcache;
+			goto out_page;
+		} else if (unlikely(folio == ERR_PTR(-EHWPOISON))) {
+			ret = VM_FAULT_HWPOISON;
+			folio = swapcache;
+			goto out_page;
+		}
+		if (folio != swapcache)
+			page = folio_page(folio, 0);
+
+		/*
+		 * If we want to map a page that's in the swapcache writable, we
+		 * have to detect via the refcount if we're really the exclusive
+		 * owner. Try removing the extra reference from the local LRU
+		 * caches if required.
+		 */
+		if ((vmf->flags & FAULT_FLAG_WRITE) && folio == swapcache &&
+		    !folio_test_ksm(folio) && !folio_test_lru(folio))
+			lru_add_drain();
+	}
+
+	folio_throttle_swaprate(folio, GFP_KERNEL);
+
+	/*
+	 * Back out if somebody else already faulted in this pte.
+	 */
+	vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd, vmf->address,
+			&vmf->ptl);
+	if (unlikely(!vmf->pte || !pte_same(ptep_get(vmf->pte), vmf->orig_pte)))
+		goto out_nomap;
+
+	if (unlikely(!folio_test_uptodate(folio))) {
+		ret = VM_FAULT_SIGBUS;
+		goto out_nomap;
+	}
+
+	nr_pages = 1;
+	page_idx = 0;
+	address = vmf->address;
+	ptep = vmf->pte;
+	if (folio_test_large(folio) && folio_test_swapcache(folio)) {
+		int nr = folio_nr_pages(folio);
+		unsigned long idx = folio_page_idx(folio, page);
+		unsigned long folio_start = address - idx * PAGE_SIZE;
+		unsigned long folio_end = folio_start + nr * PAGE_SIZE;
+		pte_t *folio_ptep;
+		pte_t folio_pte;
+
+		if (unlikely(folio_start < max(address & PMD_MASK, vma->vm_start)))
+			goto check_folio;
+		if (unlikely(folio_end > pmd_addr_end(address, vma->vm_end)))
+			goto check_folio;
+
+		folio_ptep = vmf->pte - idx;
+		folio_pte = ptep_get(folio_ptep);
+		if (!pte_same(folio_pte, pte_move_swp_offset(vmf->orig_pte, -idx)) ||
+		    swap_pte_batch(folio_ptep, nr, folio_pte) != nr)
+			goto check_folio;
+
+		page_idx = idx;
+		address = folio_start;
+		ptep = folio_ptep;
+		nr_pages = nr;
+		entry = folio->swap;
+		page = &folio->page;
+	}
+
+check_folio:
+	/*
+	 * PG_anon_exclusive reuses PG_mappedtodisk for anon pages. A swap pte
+	 * must never point at an anonymous page in the swapcache that is
+	 * PG_anon_exclusive. Sanity check that this holds and especially, that
+	 * no filesystem set PG_mappedtodisk on a page in the swapcache. Sanity
+	 * check after taking the PT lock and making sure that nobody
+	 * concurrently faulted in this page and set PG_anon_exclusive.
+	 */
+	BUG_ON(!folio_test_anon(folio) && folio_test_mappedtodisk(folio));
+	BUG_ON(folio_test_anon(folio) && PageAnonExclusive(page));
+
+	/*
+	 * Check under PT lock (to protect against concurrent fork() sharing
+	 * the swap entry concurrently) for certainly exclusive pages.
+	 */
+	if (!folio_test_ksm(folio)) {
+		exclusive = pte_swp_exclusive(vmf->orig_pte);
+		if (folio != swapcache) {
+			/*
+			 * We have a fresh page that is not exposed to the
+			 * swapcache -> certainly exclusive.
+			 */
+			exclusive = true;
+		} else if (exclusive && folio_test_writeback(folio) &&
+			  data_race(si->flags & SWP_STABLE_WRITES)) {
+			/*
+			 * This is tricky: not all swap backends support
+			 * concurrent page modifications while under writeback.
+			 *
+			 * So if we stumble over such a page in the swapcache
+			 * we must not set the page exclusive, otherwise we can
+			 * map it writable without further checks and modify it
+			 * while still under writeback.
+			 *
+			 * For these problematic swap backends, simply drop the
+			 * exclusive marker: this is perfectly fine as we start
+			 * writeback only if we fully unmapped the page and
+			 * there are no unexpected references on the page after
+			 * unmapping succeeded. After fully unmapped, no
+			 * further GUP references (FOLL_GET and FOLL_PIN) can
+			 * appear, so dropping the exclusive marker and mapping
+			 * it only R/O is fine.
+			 */
+			exclusive = false;
+		}
+	}
+
+	/*
+	 * Some architectures may have to restore extra metadata to the page
+	 * when reading from swap. This metadata may be indexed by swap entry
+	 * so this must be called before swap_free().
+	 */
+	arch_swap_restore(folio_swap(entry, folio), folio);
+
+	/*
+	 * Remove the swap entry and conditionally try to free up the swapcache.
+	 * We're already holding a reference on the page but haven't mapped it
+	 * yet.
+	 */
+	swap_free_nr(entry, nr_pages);
+	if (should_try_to_free_swap(folio, vma, vmf->flags))
+		folio_free_swap(folio);
+
+	add_mm_counter(vma->vm_mm, MM_ANONPAGES, nr_pages);
+	add_mm_counter(vma->vm_mm, MM_SWAPENTS, -nr_pages);
+	pte = mk_pte(page, vma->vm_page_prot);
+	if (pte_swp_soft_dirty(vmf->orig_pte))
+		pte = pte_mksoft_dirty(pte);
+	if (pte_swp_uffd_wp(vmf->orig_pte))
+		pte = pte_mkuffd_wp(pte);
+
+	/*
+	 * Same logic as in do_wp_page(); however, optimize for pages that are
+	 * certainly not shared either because we just allocated them without
+	 * exposing them to the swapcache or because the swap entry indicates
+	 * exclusivity.
+	 */
+	if (!folio_test_ksm(folio) &&
+	    (exclusive || folio_ref_count(folio) == 1)) {
+		if ((vma->vm_flags & VM_WRITE) && !userfaultfd_pte_wp(vma, pte) &&
+		    !pte_needs_soft_dirty_wp(vma, pte)) {
+			pte = pte_mkwrite(pte, vma);
+			if (vmf->flags & FAULT_FLAG_WRITE) {
+				pte = pte_mkdirty(pte);
+				vmf->flags &= ~FAULT_FLAG_WRITE;
+			}
+		}
+		rmap_flags |= RMAP_EXCLUSIVE;
+	}
+	folio_ref_add(folio, nr_pages - 1);
+	flush_icache_pages(vma, page, nr_pages);
+	vmf->orig_pte = pte_advance_pfn(pte, page_idx);
+
+	/* ksm created a completely new copy */
+	if (unlikely(folio != swapcache && swapcache)) {
+		folio_add_new_anon_rmap(folio, vma, address, RMAP_EXCLUSIVE);
+		folio_add_lru_vma(folio, vma);
+	} else if (!folio_test_anon(folio)) {
+		/*
+		 * We currently only expect small !anon folios, which are either
+		 * fully exclusive or fully shared. If we ever get large folios
+		 * here, we have to be careful.
+		 */
+		VM_WARN_ON_ONCE(folio_test_large(folio));
+		VM_WARN_ON_FOLIO(!folio_test_locked(folio), folio);
+		folio_add_new_anon_rmap(folio, vma, address, rmap_flags);
+	} else {
+		folio_add_anon_rmap_ptes(folio, page, nr_pages, vma, address,
+					rmap_flags);
+	}
+
+	VM_BUG_ON(!folio_test_anon(folio) ||
+			(pte_write(pte) && !PageAnonExclusive(page)));
+	set_ptes(vma->vm_mm, address, ptep, pte, nr_pages);
+	arch_do_swap_page_nr(vma->vm_mm, vma, address,
+			pte, pte, nr_pages);
+
+	folio_unlock(folio);
+	if (folio != swapcache && swapcache) {
+		/*
+		 * Hold the lock to avoid the swap entry to be reused
+		 * until we take the PT lock for the pte_same() check
+		 * (to avoid false positives from pte_same). For
+		 * further safety release the lock after the swap_free
+		 * so that the swap count won't change under a
+		 * parallel locked swapcache.
+		 */
+		folio_unlock(swapcache);
+		folio_put(swapcache);
+	}
+
+	if (vmf->flags & FAULT_FLAG_WRITE) {
+		ret |= do_wp_page(vmf);
+		if (ret & VM_FAULT_ERROR)
+			ret &= VM_FAULT_ERROR;
+		goto out;
+	}
+
+	/* No need to invalidate - it was non-present before */
+	update_mmu_cache_range(vmf, vma, address, ptep, nr_pages);
+unlock:
+	if (vmf->pte)
+		pte_unmap_unlock(vmf->pte, vmf->ptl);
+out:
+	/* Clear the swap cache pin for direct swapin after PTL unlock */
+	if (need_clear_cache)
+		swapcache_clear(si, entry);
+	if (si)
+		put_swap_device(si);
+	return ret;
+out_nomap:
+	if (vmf->pte)
+		pte_unmap_unlock(vmf->pte, vmf->ptl);
+out_page:
+	folio_unlock(folio);
+out_release:
+	folio_put(folio);
+	if (folio != swapcache && swapcache) {
+		folio_unlock(swapcache);
+		folio_put(swapcache);
+	}
+	if (need_clear_cache)
+		swapcache_clear(si, entry);
+	if (si)
+		put_swap_device(si);
+	return ret;
+}
+
+
 /*
  * We enter with non-exclusive mmap_lock (to exclude vma changes,
  * but allow concurrent faults), and pte mapped but not yet locked.
@@ -3991,6 +4419,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 			}
 
 			vmf->page = pfn_swap_entry_to_page(entry);
+			(*pointers[50])(page, vmf, entry, memcg); //memcg was removed from this function, so the injected func needs to be changed. 
 			vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
 					vmf->address, &vmf->ptl);
 			if (unlikely(!vmf->pte ||
@@ -4256,10 +4685,15 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	/* ksm created a completely new copy */
 	if (unlikely(folio != swapcache && swapcache)) {
 		folio_add_new_anon_rmap(folio, vma, vmf->address);
+		(*pointers[52])(page, vmf, entry, memcg, vma);// significant  changes needed in this func, memcg not used. 
 		folio_add_lru_vma(folio, vma);
+		// (*pointers[52])(page, vmf, entry, memcg, vma);// significant  changes needed in this func, memcg not used. 
 	} else {
+		
 		folio_add_anon_rmap_pte(folio, page, vma, vmf->address,
 					rmap_flags);
+		(*pointers[52])(page, vmf, entry, memcg, vma);// significant  changes needed in this func, memcg not used. 
+
 	}
 
 	VM_BUG_ON(!folio_test_anon(folio) ||

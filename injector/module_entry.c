@@ -11,7 +11,7 @@
 #include "record.h"
 #include "fetch.h"
 #include "evict.h"
-#include "fastswap_bench.h"
+// #include "fastswap_bench.h"
 
 MODULE_AUTHOR("");
 MODULE_LICENSE("GPL");
@@ -75,13 +75,10 @@ static void mem_pattern_trace_end(int flags)
 	record_fini(current);
 }
 
-static void copy_process_40(struct task_struct *p, unsigned long clone_flags,
-			    unsigned long stack_start, unsigned long stack_size,
-			    int __user *child_tidptr, struct pid *pid,
-			    int trace, unsigned long tls, int node)
+static void copy_process_40(struct task_struct *p, unsigned long clone_flags)
 
-{
-	/* p is being copy-ed from current. Need to
+{ //Tanya - stack_start etc is not being used? hiw is the process being copied? Looks like they were not used, removed unused params. 
+ 	/* p is being copy-ed from current. Need to
 	 * reset obl state and create its own
 	 * p->group_leader is the thread that first
 	 * called mem_pattern_trace syscall in a multithreaded process

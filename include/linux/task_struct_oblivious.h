@@ -1,6 +1,10 @@
 #ifndef TASK_STRUCT_OBLIVIOUS_H
 #define TASK_STRUCT_OBLIVIOUS_H
+
+static __always_inline unsigned long long rdtsc(void);
+
 #include <linux/workqueue.h>
+#include <linux/workqueue_types.h>
 #include <linux/ktime.h> // Needed for stats
 /*
  * task_struct_oblivious is embedded in struct task_struct as ->obl
