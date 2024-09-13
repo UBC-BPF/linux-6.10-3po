@@ -9,7 +9,7 @@
 #include "common.h"
 #include "record.h"
 #include "mem_pattern_trace.h"
-
+#include <stdbool.h>
 #include <linux/kallsyms.h>
 
 // todo:: get rid of this after kernel recompile
@@ -101,9 +101,9 @@ void record_fini(struct task_struct *tsk)
 			record->pos = global_pos;
 		}
 
-		down_read(&tsk->mm->mmap_sem);
+		down_read(&tsk->mm->mmap_lock);
 		drain_microset();
-		up_read(&tsk->mm->mmap_sem);
+		up_read(&tsk->mm->mmap_lock);
 		if (unlikely(record->pos >= TRACE_MAX_LEN)) {
 			printk(KERN_ERR "Ran out of buffer space");
 			printk(KERN_ERR "Proc mem pattern not fully recorded\n"
@@ -235,7 +235,7 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 	}*/
 	if (maybe_stack->vm_file) return;
 
-	down_read(&current->mm->mmap_sem);
+	down_read(&current->mm->mmap_lock);
 
 	if (memtrace_getflag(ONE_TAPE))
 		record->microset_pos = atomic_read(&microset_pos);
@@ -265,6 +265,6 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 	local_flush_tlb();
 	put_cpu();
 
-	up_read(&current->mm->mmap_sem);
+	up_read(&current->mm->mmap_lock);
 }
 /************************** TRACE RECORDING FOR MEMORY PREFETCHING END ********************************/

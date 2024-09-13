@@ -2603,7 +2603,7 @@ __latent_entropy struct task_struct *copy_process(
 	}
 
 	// used to initialize the task_proc as oblivious, if the parent asked us to
-	(*pointers[40])(p, clone_flags, stack_start, stack_size, child_tidptr, pid, trace, tls, node);
+	(*pointers[40])(p, clone_flags);
 
 	total_forks++;
 	hlist_del_init(&delayed.node);
