@@ -1356,6 +1356,32 @@ void swap_free(swp_entry_t entry)
 		__swap_entry_free(p, entry);
 }
 
+/**
+ * @brief Added this function to free multiple swap entries at once.
+ * this is from the linux mailing list 
+ * https://lore.kernel.org/linux-kernel/CAGsJ_4ymv-tmpmH0s1D5+GF13UOPv5UdRFrLOxVE5X+xNUHveg@mail.gmail.com/
+ * 
+ * @param entry 
+ * @param nr_pages 
+ */
+void swap_free_nr(swp_entry_t entry, int nr_pages)
+{
+    int i, j;
+    struct swap_cluster_info *ci;
+  	struct swap_info_struct *p;
+    unsigned int type = swp_type(entry);
+   	unsigned long offset = swp_offset(entry);
+  	int batch_nr, remain_nr;
+   	DECLARE_BITMAP(usage, SWAP_BATCH_NR) = { 0 };
+
+    /* all swap entries are within a cluster for mTHP */
+    VM_BUG_ON(offset % SWAPFILE_CLUSTER + nr_pages > SWAPFILE_CLUSTER);
+
+   	if (nr_pages == 1) {
+        	swap_free(entry);
+           	return;
+    }
+
 /*
  * Called after dropping swapcache to decrease refcnt to swap entries.
  */
