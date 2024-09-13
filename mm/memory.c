@@ -3969,7 +3969,7 @@ vm_fault_t do_swap_page_prefault_3po(struct vm_fault *vmf)
 	swp_entry_t entry;
 	pte_t pte;
 	vm_fault_t ret = 0;
-	void *shadow = NULL;
+	// void *shadow = NULL;
 	int nr_pages;
 	unsigned long page_idx;
 	unsigned long address;
@@ -4284,8 +4284,8 @@ check_folio:
 	 */
 	if (!folio_test_ksm(folio) &&
 	    (exclusive || folio_ref_count(folio) == 1)) {
-		if ((vma->vm_flags & VM_WRITE) && !userfaultfd_pte_wp(vma, pte) &&
-		    !pte_needs_soft_dirty_wp(vma, pte)) {
+		if ((vma->vm_flags & VM_WRITE) && !userfaultfd_pte_wp(vma, pte) && !(vma_soft_dirty_enabled(vma) && !pte_soft_dirty(pte))){
+		    // !pte_needs_soft_dirty_wp(vma, pte)) {
 			pte = pte_mkwrite(pte, vma);
 			if (vmf->flags & FAULT_FLAG_WRITE) {
 				pte = pte_mkdirty(pte);
@@ -4300,7 +4300,8 @@ check_folio:
 
 	/* ksm created a completely new copy */
 	if (unlikely(folio != swapcache && swapcache)) {
-		folio_add_new_anon_rmap(folio, vma, address, RMAP_EXCLUSIVE);
+		// folio_add_new_anon_rmap(folio, vma, address, RMAP_EXCLUSIVE);
+		folio_add_new_anon_rmap(folio, vma, address);
 		folio_add_lru_vma(folio, vma);
 	} else if (!folio_test_anon(folio)) {
 		/*
@@ -4310,7 +4311,8 @@ check_folio:
 		 */
 		VM_WARN_ON_ONCE(folio_test_large(folio));
 		VM_WARN_ON_FOLIO(!folio_test_locked(folio), folio);
-		folio_add_new_anon_rmap(folio, vma, address, rmap_flags);
+		// folio_add_new_anon_rmap(folio, vma, address, rmap_flags);
+		folio_add_new_anon_rmap(folio, vma, address);
 	} else {
 		folio_add_anon_rmap_ptes(folio, page, nr_pages, vma, address,
 					rmap_flags);
@@ -4685,14 +4687,14 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 	/* ksm created a completely new copy */
 	if (unlikely(folio != swapcache && swapcache)) {
 		folio_add_new_anon_rmap(folio, vma, vmf->address);
-		(*pointers[52])(page, vmf, entry, memcg, vma);// significant  changes needed in this func, memcg not used. 
+		// (*pointers[52])(page, vmf, entry, memcg, vma);// significant  changes needed in this func, memcg not used. 
 		folio_add_lru_vma(folio, vma);
 		// (*pointers[52])(page, vmf, entry, memcg, vma);// significant  changes needed in this func, memcg not used. 
 	} else {
 		
 		folio_add_anon_rmap_pte(folio, page, vma, vmf->address,
 					rmap_flags);
-		(*pointers[52])(page, vmf, entry, memcg, vma);// significant  changes needed in this func, memcg not used. 
+		// (*pointers[52])(page, vmf, entry, memcg, vma);// significant  changes needed in this func, memcg not used. 
 
 	}
 
