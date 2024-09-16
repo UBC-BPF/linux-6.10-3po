@@ -4421,7 +4421,7 @@ vm_fault_t do_swap_page(struct vm_fault *vmf)
 			}
 
 			vmf->page = pfn_swap_entry_to_page(entry);
-			(*pointers[50])(page, vmf, entry, memcg); //memcg was removed from this function, so the injected func needs to be changed. 
+			(*pointers[50])(page, vmf, entry); //memcg was removed from this function, so the injected func needs to be changed. 
 			vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
 					vmf->address, &vmf->ptl);
 			if (unlikely(!vmf->pte ||

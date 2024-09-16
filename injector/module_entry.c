@@ -119,7 +119,7 @@ static void do_exit_41()
 
 // used in the mechanism to keep prefetched pages in cache before first use
 static void do_swap_page_50(struct page *page, struct vm_fault *vmf,
-			    swp_entry_t entry, struct mem_cgroup *memcg)
+			    swp_entry_t entry)
 {
 	if (page && test_bit(PG_unevictable, &page->flags))
 		clear_bit(PG_unevictable, &page->flags);

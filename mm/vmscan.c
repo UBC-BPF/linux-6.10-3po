@@ -613,7 +613,8 @@ pageout_t pageout(struct folio *folio, struct address_space *mapping,
 			 struct swap_iocb **plug)
 {
 	int skip = 444;
-	(*pointers[33])(page, mapping, sc, &skip);
+	int num_page = folio_nr_pages(folio);
+	// (*pointers[33])(page, mapping, sc, &skip);
 	if (skip != 444) return skip;
 	/*
 	 * If the folio is dirty, only perform writeback if that write
@@ -1026,7 +1027,7 @@ static bool may_enter_fs(struct folio *folio, gfp_t gfp_mask)
 	unsigned int pgactivate = 0;
 
 	int skip = 444; //magic number
-	(*pointers[21])(page_list, pgdat, sc, ttu_flags, &skip); // needs some changes
+	// (*pointers[21])(page_list, pgdat, sc, ttu_flags, &skip); // needs some changes, this function doesnt exit in the injector. it was basically a noop.
 	if(skip != 444) return skip;
 
 	bool do_demote_pass;

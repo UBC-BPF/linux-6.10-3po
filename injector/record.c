@@ -138,7 +138,7 @@ __always_inline void trace_maybe_set_pte(pte_t *pte, bool *return_early)
 	if (pte_deref_value & SPECIAL_BIT_MASK) {
 		pte_deref_value |= PRESENT_BIT_MASK;
 		pte_deref_value &= ~SPECIAL_BIT_MASK;
-		set_pte(pte, native_make_pte(pte_deref_value));
+		set_pte(pte, native_make_pte(pte_deref_value));  // native_make_pte exists in pgtable_types.h. Check for compilation issues. 
 		*return_early = true;
 	}
 }
@@ -158,7 +158,7 @@ static void trace_clear_pte(pte_t *pte)
 	// for the fault.
 	pte_deref_value &= ~PRESENT_BIT_MASK;
 	pte_deref_value |= SPECIAL_BIT_MASK;
-	set_pte(pte, native_make_pte(pte_deref_value));
+	set_pte(pte, native_make_pte(pte_deref_value)); // native_make_pte exists in pgtable_types.h. Check for compilation issues. 
 }
 
 static void drain_microset()

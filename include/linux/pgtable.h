@@ -1099,6 +1099,19 @@ static inline void arch_do_swap_page(struct mm_struct *mm,
 {
 
 }
+
+static inline void arch_do_swap_page_nr(struct mm_struct *mm,
+					struct vm_area_struct *vma,
+					unsigned long addr,
+				pte_t pte, pte_t oldpte,
+				int nr)
+{
+	for (int i = 0; i < nr; i++) {
+		arch_do_swap_page(vma->vm_mm, vma, addr + i * PAGE_SIZE,
+				pte_advance_pfn(pte, i),
+				pte_advance_pfn(oldpte, i));
+	}
+ }
 #endif
 
 #ifndef __HAVE_ARCH_UNMAP_ONE

@@ -205,7 +205,9 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 	//the page needs to be under writeback *before* the page is submitted
 	// to RDMA.
 	folio_start_writeback(folio);
-	if (zswap_store_async(folio)==0) {// tanya: below comment copied from source
+	if (zswap_store(folio)==0) {  //zswap_store should be
+	// zswap_store_async but that doesnt exist/not implemented
+ 		// tanya: below comment copied from source
 			//todo:: I do not understand set_page_writeback/end_page_writeback
 		//and the kernel docs warn that getting this wrong can lead to data loss
 
