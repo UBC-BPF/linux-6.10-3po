@@ -49,7 +49,7 @@
 #include <linux/swap_cgroup.h>
 #include "internal.h"
 #include "swap.h"
-
+#define SWAP_BATCH_NR (SWAPFILE_CLUSTER > 64 ? 64 : SWAPFILE_CLUSTER)
 static bool swap_count_continued(struct swap_info_struct *, pgoff_t,
 				 unsigned char);
 static void free_swap_count_continuations(struct swap_info_struct *);
