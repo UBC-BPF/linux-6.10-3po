@@ -2652,12 +2652,12 @@ EXPORT_SYMBOL(reclaim_high);
 #define MAX_RECLAIM_OFFLOAD 2048UL
 static void high_work_func(struct work_struct *work)
 {
-	struct mem_cgroup *memcg;
+	// struct mem_cgroup *memcg;
 	bool skip;
 	// memcg = container_of(work, struct mem_cgroup, high_work);
 	// reclaim_high(memcg, MEMCG_CHARGE_BATCH, GFP_KERNEL);
 	struct mem_cgroup *memcg = container_of(work, struct mem_cgroup, high_work);
-	unsigned long high = memcg->high;
+	unsigned long high = memcg->memory.high;
 	unsigned long nr_pages = page_counter_read(&memcg->memory);
 	unsigned long reclaim;
 
@@ -2673,7 +2673,7 @@ static void high_work_func(struct work_struct *work)
 		/* reclaim_high only reclaims iff nr_pages > high */
 		reclaim_high(memcg, reclaim, GFP_KERNEL);
 	}
-	if (page_counter_read(&memcg->memory) > memcg->high)
+	if (page_counter_read(&memcg->memory) > memcg->memory.high)
 		schedule_work_on(FASTSWAP_RECLAIM_CPU, &memcg->high_work);
 
 
@@ -3096,6 +3096,7 @@ done_restock:
 			} else {
 				schedule_work_on(FASTSWAP_RECLAIM_CPU, &memcg->high_work);
 			}
+		}
 		
 
 		if (mem_high || swap_high) {

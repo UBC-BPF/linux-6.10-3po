@@ -1381,6 +1381,7 @@ void swap_free_nr(swp_entry_t entry, int nr_pages)
         	swap_free(entry);
            	return;
     }
+}
 
 /*
  * Called after dropping swapcache to decrease refcnt to swap entries.
