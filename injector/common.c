@@ -6,6 +6,7 @@
 
 #include <linux/fs.h> // Needed by filp
 #include <asm/uaccess.h> // Needed by segment descriptors
+#include <linux/uaccess.h>
 
 #include "common.h"
 
@@ -96,10 +97,10 @@ static bool file_stat(const char *filepath, struct kstat *stat_struct)
 {
 	bool err;
 
-	mm_segment_t old_fs = get_fs();
-	set_fs(get_ds()); // kernel_ds
+	// mm_segment_t old_fs = get_fs();
+	// set_fs(get_ds()); // kernel_ds
 	err = vfs_stat(filepath, stat_struct);
-	set_fs(old_fs);
+	// set_fs(old_fs);
 	return err;
 }
 
@@ -109,20 +110,20 @@ bool file_exists(const char *filepath)
 	return 0 == file_stat(filepath, &trace_stat);
 }
 
-size_t file_size(const char *filepath)
-{
-	struct kstat trace_stat;
-	if (file_stat(filepath, &trace_stat) != 0)
-		return -1;
-	return trace_stat.size;
-}
+// size_t file_size(const char *filepath)
+// {
+// 	struct kstat trace_stat;
+// 	if (file_stat(filepath, &trace_stat) != 0)
+// 		return -1;
+// 	return trace_stat.size;
+// }
 
 size_t read_tape(const char *filepath, char *buf, long max_len)
 {
 	struct file *f;
 	size_t count = 0;
-	mm_segment_t old_fs = get_fs();
-	set_fs(get_ds()); // KERNEL_DS
+	// mm_segment_t old_fs = get_fs();
+	// set_fs(get_ds()); // KERNEL_DS
 	f = filp_open(filepath, O_RDONLY | O_LARGEFILE, 0);
 	if (f == NULL) {
 		printk(KERN_ERR "unable to open %s for reading", filepath);
@@ -130,7 +131,7 @@ size_t read_tape(const char *filepath, char *buf, long max_len)
 	}
 
 	while (count < max_len) {
-		ssize_t rv = vfs_read(f, &buf[count], max_len - count, &f->f_pos);
+		ssize_t rv = kernel_read(f, &buf[count], max_len - count, &f->f_pos);
 		if (rv == 0) {
 			goto success;
 		} else if (rv < 0) {
@@ -142,7 +143,7 @@ size_t read_tape(const char *filepath, char *buf, long max_len)
 
 	{
 		char scratch;
-		ssize_t rv = vfs_read(f, &scratch, 1, &f->f_pos);
+		ssize_t rv = kernel_read(f, &scratch, 1, &f->f_pos);
 		if (likely(rv == 0)) {
 			goto success;
 		} else {
@@ -155,7 +156,7 @@ fail:
 
 success:
 	filp_close(f, NULL);
-	set_fs(old_fs);
+	// set_fs(old_fs);
 	return count;
 }
 
@@ -163,8 +164,8 @@ struct file *open_trace(const char *filepath)
 {
 	struct file *f;
 
-	mm_segment_t old_fs = get_fs();
-	set_fs(get_ds()); // KERNEL_DS
+	// mm_segment_t old_fs = get_fs();
+	// set_fs(get_ds()); // KERNEL_DS
 
 	// todo::mkdir before open
 	f = filp_open(filepath, O_CREAT | O_WRONLY | O_LARGEFILE, 0644);
@@ -175,26 +176,26 @@ struct file *open_trace(const char *filepath)
 		f = NULL;
 	}
 
-	set_fs(old_fs);
+	// set_fs(old_fs);
 	return f;
 }
 
 void close_trace(struct file *f)
 {
-	mm_segment_t old_fs = get_fs();
-	set_fs(get_ds()); // KERNEL_DS
+	// mm_segment_t old_fs = get_fs();
+	// set_fs(get_ds()); // KERNEL_DS
 
 	filp_close(f, NULL);
 
-	set_fs(old_fs);
+	// set_fs(old_fs);
 }
 
 void write_buffered_trace_to_file(struct file *f, const char *buf, long len)
 {
 	long left_to_write = len;
 
-	mm_segment_t old_fs = get_fs();
-	set_fs(get_ds()); // KERNEL_DS
+	// mm_segment_t old_fs = get_fs();
+	// set_fs(get_ds()); // KERNEL_DS
 
 	printk(KERN_DEBUG "Writing recorded trace (num accesses=%ld)",
 	       len / sizeof(void *));
@@ -202,7 +203,7 @@ void write_buffered_trace_to_file(struct file *f, const char *buf, long len)
 	while (left_to_write > 0) {
 		// cannot write more than 2g at a time from kernel
 		// fixed in newer kernels, I guess just upgrade?
-		ssize_t count = kernel_write(f, buf, left_to_write, f->f_pos);
+		ssize_t count = kernel_write(f, buf, left_to_write, &f->f_pos);
 
 		//size_t can not be smaller than zero
 		if (count < 0) {
@@ -224,7 +225,7 @@ void write_buffered_trace_to_file(struct file *f, const char *buf, long len)
 		       left_to_write, len);
 	}
 
-	set_fs(old_fs);
+	// set_fs(old_fs);
 }
 
 void log_pfault(struct pt_regs *regs, unsigned long error_code,
