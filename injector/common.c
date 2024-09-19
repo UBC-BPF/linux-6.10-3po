@@ -26,6 +26,7 @@ struct dentry *debugfs_root;
 pte_t *addr2pte(unsigned long addr, struct mm_struct *mm)
 {
 	pgd_t *pgd;
+	p4d_t *p4d;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte = NULL;
@@ -36,7 +37,12 @@ pte_t *addr2pte(unsigned long addr, struct mm_struct *mm)
 	pgd = pgd_offset(mm, addr);
 	if (unlikely(pgd_none(*pgd) || pgd_bad(*pgd)))
 		return pte;
-	pud = pud_offset(pgd, addr);
+
+	p4d = p4d_offset(pgd, addr);
+	if (unlikely(p4d_none(*p4d) || p4d_bad(*p4d)))
+		return pte;
+	
+	pud = pud_offset(p4d, addr);
 	if (unlikely(pud_none(*pud) || pud_bad(*pud)))
 		return pte;
 	pmd = pmd_offset(pud, addr);
@@ -52,7 +58,7 @@ pte_t *addr2pte(unsigned long addr, struct mm_struct *mm)
 	// we never add them to the trace record
 
 	// todo:: to support thp, do some error checking here and see if a huge page is being allocated
-	if (unlikely(pmd_none(*pmd) || pud_large(*pud)))
+	if (unlikely(pmd_none(*pmd) || pud_large(*pud))) // I think with folios this should be irrelavent now, to be commented 
 		return pte;
 
 	//todo:: pte_offset_map_lock<-- what is this? when whould I need to take a lock?
@@ -64,6 +70,7 @@ pte_t *addr2pte(unsigned long addr, struct mm_struct *mm)
 pte_t *addr2ptepmd(unsigned long addr, struct mm_struct *mm, pmd_t **pmd_ret)
 {
 	pgd_t *pgd;
+	p4d_t *p4d;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte = NULL;
@@ -71,7 +78,12 @@ pte_t *addr2ptepmd(unsigned long addr, struct mm_struct *mm, pmd_t **pmd_ret)
 	pgd = pgd_offset(mm, addr);
 	if (pgd_none(*pgd) || pgd_bad(*pgd))
 		return pte;
-	pud = pud_offset(pgd, addr);
+
+	p4d = p4d_offset(pgd, addr);
+	if (p4d_none(*p4d) || p4d_bad(*p4d))
+		return pte;
+
+	pud = pud_offset(p4d, addr);
 	if (pud_none(*pud) || pud_bad(*pud))
 		return pte;
 	pmd = pmd_offset(pud, addr);
