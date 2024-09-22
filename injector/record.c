@@ -265,7 +265,9 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 	// TODO: Ensure that local_flush_tlb_all() is the correct function to call here.
 	get_cpu();
 	//flush_tlb_all_p();
-	local_flush_tlb_all();
+	// local_flush_tlb_all(); doesnt exit anymore, below should be the replacement	
+	__flush_tlb_all();
+
 	put_cpu();
 
 	up_read(&current->mm->mmap_lock);
