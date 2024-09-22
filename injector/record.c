@@ -9,7 +9,7 @@
 #include "common.h"
 #include "record.h"
 #include "mem_pattern_trace.h"
-#include <stdbool.h>
+#include <linux/types.h>
 #include <linux/kallsyms.h>
 
 // todo:: get rid of this after kernel recompile
@@ -58,7 +58,7 @@ void record_init(struct task_struct *tsk, int flags, unsigned int microset_size)
 	       record->microset_size * sizeof(unsigned long));
 }
 
-static void drain_microset();
+static void drain_microset(void);
 
 static void open_trace_file(struct task_struct *tsk) {
 	struct trace_recording_state *record = &tsk->obl.record;
@@ -161,7 +161,7 @@ static void trace_clear_pte(pte_t *pte)
 	set_pte(pte, native_make_pte(pte_deref_value)); // native_make_pte exists in pgtable_types.h. Check for compilation issues. 
 }
 
-static void drain_microset()
+static void drain_microset(void)
 {
 	struct trace_recording_state *record = &current->obl.record;
 	unsigned long i;
@@ -194,7 +194,6 @@ static void drain_microset()
 	}
 	put_cpu();
 }
-
 void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 			       unsigned long address, struct task_struct *tsk,
 			       bool *return_early, int magic)
@@ -213,7 +212,10 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 	maybe_stack = find_vma(current->mm, address);
 	if (unlikely(0x800000 ==
 		     maybe_stack->vm_end - maybe_stack->vm_start)) {
-		struct vm_area_struct *prot_page = maybe_stack->vm_prev;
+		struct vm_area_struct *next;
+		// struct vm_area_struct *prot_page = maybe_stack->vm_prev;
+		struct vm_area_struct *prot_page;
+		next= find_vma_prev(current->mm, maybe_stack->vm_start, &prot_page);
 		/*
 		 * Each mprotect() call explicitly passes r/w/x permissions.
 		 * If a permission is not passed to mprotect(), it must be
@@ -260,9 +262,10 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 	// the following, if used correctly, can trace TLB count.
 	// trace_tlb_flush(TLB_LOCAL_SHOOTDOWN, TLB_FLUSH_ALL);
 	//count_vm_tlb_event(NR_TLB_LOCAL_FLUSH_ALL);
+	// TODO: Ensure that local_flush_tlb_all() is the correct function to call here.
 	get_cpu();
 	//flush_tlb_all_p();
-	local_flush_tlb();
+	local_flush_tlb_all();
 	put_cpu();
 
 	up_read(&current->mm->mmap_lock);
