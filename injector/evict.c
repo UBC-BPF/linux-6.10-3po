@@ -1,16 +1,10 @@
-#include <linux/workqueue.h>
-#include <linux/memcontrol.h>
-#include <linux/delay.h>
-#include <linux/printk.h>
-#include <linux/swap.h>
+#include "evict.h"
 
-#include <linux/mm_inline.h> // for lru_to_page and other inline lru stuff
+extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *memcg,
+					   unsigned long nr_pages,
+					   gfp_t gfp_mask,
+					   unsigned int reclaim_options);
 
-#include "common.h"
-#include <linux/injections.h>
-
-// #include <linux/frontswap.h>
-#include <linux/pagemap.h>
 #define MAX_PRINT_LEN 768
 extern char fetch_print_buf[MAX_PRINT_LEN];
 extern char *fetch_buf_end;
@@ -45,16 +39,22 @@ static void high_work_func_30(struct work_struct *work,
 		 * take care of from where we get pages. So the node where we start the
 		 * scan does not need to be the current node.
 		 */
-		nid = mem_cgroup_select_victim_node(memcg);
+		
+		// For the time being, I am relying on how the current numa node ID, similar to what is done in mm/mempolicy.c:1923
+		nid = numa_mem_id();
 
 		zonelist = &NODE_DATA(nid)->node_zonelists[ZONELIST_FALLBACK];
+
+		// Alternative option based on:
+		// https://github.com/torvalds/linux/commit/fa40d1ee9f156624658ca409a04a78882ca5b3c5#diff-d503e0c4ef59449a7b9dd9f14c3f88b35578cdec99edbd05970e0599faf1c324R3370 
+		// zonelist = node_zonelist(numa_node_id(), GFP_HIGHUSER_MOVABLE); // gfp_t based on fetch.c in the prefetch_addr() function
 
 		// nodemask=NULL below includes all nodes
 		// reclaim_idx = MAX_NR_ZONES-1 indicates that pages can be isolated from all zones
 		for_each_zone_zonelist_nodemask (zone, z, zonelist,
 						 MAX_NR_ZONES - 1, NULL) {
 			pg_data_t *pgdat = zone->zone_pgdat;
-			struct lruvec *lruvec = mem_cgroup_lruvec(pgdat, memcg);
+			struct lruvec *lruvec = mem_cgroup_lruvec(memcg, pgdat);
 			enum lru_list lru;
 
 			//get_scan_count(lruvec, memcg, sc, nr, num_lru_pages);
@@ -68,7 +68,7 @@ static void high_work_func_30(struct work_struct *work,
 				char *buf_end;
 
 				unsigned long lru_size =
-					mem_cgroup_get_lru_size(lruvec, lru);
+					lruvec_page_state(lruvec, NR_LRU_BASE + lru);
 				if (list_empty(src))
 					continue;
 
@@ -77,7 +77,10 @@ static void high_work_func_30(struct work_struct *work,
 				buf_end = evict.print_buf;
 				// Taking the lock is important and makes sure memory is not freed
 				// under our feed resulting in a panic
-				spin_lock_irq(zone_lru_lock(zone));
+
+				// Note: zone_lru_lock(node) was replaced by pgdat->lru_lock (ref: https://github.com/torvalds/linux/commit/f4b7e272b5c0425915e2115068e0a5a20a3a628e)
+				// pgdat->lru_lock was yet replaced by pgdat->__lruvec.lru_lock (ref: https://github.com/torvalds/linux/commit/15b447361794271f4d03c04d82276a841fe06328)
+				spin_lock_irq(&(pgdat->__lruvec.lru_lock));
 				// thre list list_for_each_entry_safe. not sure about all the diffs,
 				// but I think it allows for modifying list elements as part of the
 				// traversal.
@@ -93,7 +96,7 @@ static void high_work_func_30(struct work_struct *work,
 							page));
 				}
 
-				spin_unlock_irq(zone_lru_lock(zone));
+				spin_unlock_irq(&(pgdat->__lruvec.lru_lock));
 				printk(KERN_INFO "lru: %d %s %d:%s %ld %s", nid,
 				       zone->name, atomic_read(&metronome),
 				       lru == LRU_INACTIVE_ANON ? "inactive" :
@@ -129,7 +132,7 @@ static void high_work_func_30(struct work_struct *work,
 		schedule_work_on(7, &memcg->high_work);
 }
 
-void evict_init()
+void evict_init(void)
 {
 	printk(KERN_INFO "init evict injections\n");
 	memset(&evict, 0, sizeof(evict));
@@ -139,7 +142,7 @@ void evict_init()
 	debugfs_create_atomic_t("metronome", 0400, debugfs_root, &metronome);
 }
 
-void evict_fini()
+void evict_fini(void)
 {
 	printk(KERN_INFO "Eviction stats:\n"
 			 "num high_work calls: %ld\n"

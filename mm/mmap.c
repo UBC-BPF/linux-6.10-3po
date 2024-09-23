@@ -1975,6 +1975,7 @@ find_vma_prev(struct mm_struct *mm, unsigned long addr,
 		vma = vma_next(&vmi);
 	return vma;
 }
+EXPORT_SYMBOL(find_vma_prev);
 
 /*
  * Verify that the stack growth is acceptable and

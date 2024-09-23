@@ -4,10 +4,10 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstrict-prototypes"
 typedef void (*injected_func_type)();
+extern void set_pointer(int i, void (*f)());
 #pragma GCC diagnostic pop
 extern injected_func_type pointers[100];
 extern void kernel_noop(void);
-extern void set_pointer(int i, void (*f)(void));
 
 enum memtrace_state_lags {
 	TAPE_OPS = 1 << 0,

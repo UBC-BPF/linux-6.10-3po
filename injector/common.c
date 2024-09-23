@@ -10,6 +10,11 @@
 
 #include "common.h"
 
+extern int vfs_fstatat(int dfd, const char __user *filename,
+			      struct kstat *stat, int flags);
+
+extern pte_t *__pte_offset_map(pmd_t *pmd, unsigned long addr, pmd_t *pmdvalp);
+
 // /data/traces/[trace_id].bin.[thread_ind]
 const char *RECORD_FILE_FMT = "/data/traces/%s/main.bin.%d";
 const char *FETCH_FILE_FMT = "/data/traces/%s/main.tape.%d";
@@ -57,9 +62,9 @@ pte_t *addr2pte(unsigned long addr, struct mm_struct *mm)
 	// add special bit to these addresses in the very beginning,
 	// we never add them to the trace record
 
-	// todo:: to support thp, do some error checking here and see if a huge page is being allocated
-	if (unlikely(pmd_none(*pmd) || pud_large(*pud))) // I think with folios this should be irrelavent now, to be commented 
-		return pte;
+	// // todo:: to support thp, do some error checking here and see if a huge page is being allocated
+	// if (unlikely(pmd_none(*pmd) || pud_large(*pud))) // I think with folios this should be irrelavent now, to be commented 
+	// 	return pte;
 
 	//todo:: pte_offset_map_lock<-- what is this? when whould I need to take a lock?
 	pte = pte_offset_map(pmd, addr);
@@ -87,8 +92,8 @@ pte_t *addr2ptepmd(unsigned long addr, struct mm_struct *mm, pmd_t **pmd_ret)
 	if (pud_none(*pud) || pud_bad(*pud))
 		return pte;
 	pmd = pmd_offset(pud, addr);
-	if (pmd_none(*pmd) || pud_large(*(pud)))
-		return pte;
+	// if (pmd_none(*pmd) || pud_large(*(pud)))
+	// 	return pte; not required with folios
 	pte = pte_offset_map(pmd, addr);
 	*pmd_ret = pmd;
 	return pte;
@@ -122,13 +127,13 @@ bool file_exists(const char *filepath)
 	return 0 == file_stat(filepath, &trace_stat);
 }
 
-// size_t file_size(const char *filepath)
-// {
-// 	struct kstat trace_stat;
-// 	if (file_stat(filepath, &trace_stat) != 0)
-// 		return -1;
-// 	return trace_stat.size;
-// }
+size_t file_size(const char *filepath)
+{
+	struct kstat trace_stat;
+	if (file_stat(filepath, &trace_stat) != 0)
+		return -1;
+	return trace_stat.size;
+}
 
 size_t read_tape(const char *filepath, char *buf, long max_len)
 {

@@ -12,6 +12,12 @@
 #include <linux/types.h>
 #include <linux/kallsyms.h>
 
+extern unsigned long kallsyms_lookup_name(const char *name);
+extern struct vm_area_struct * find_vma_prev(
+	struct mm_struct *mm, 
+	unsigned long addr,
+	struct vm_area_struct **pprev);
+
 // todo:: get rid of this after kernel recompile
 static void (*flush_tlb_all_p)(void);
 

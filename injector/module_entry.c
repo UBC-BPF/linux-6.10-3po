@@ -110,7 +110,7 @@ static void do_page_fault_2(struct pt_regs *regs, unsigned long error_code,
 					  return_early, magic);
 }
 
-static void do_exit_41()
+static void do_exit_41(void)
 {
 	if (!(current->obl.flags & OBLIVIOUS_TAG))
 		return;
@@ -125,11 +125,11 @@ static void do_swap_page_50(struct page *page, struct vm_fault *vmf,
 		clear_bit(PG_unevictable, &page->flags);
 }
 
-static void do_swap_page_end_52(struct page *page, struct vm_fault *vmf,
-				swp_entry_t entry, struct mem_cgroup *memcg,
-				struct vm_area_struct *vma)
-{
-}
+// static void do_swap_page_end_52(struct page *page, struct vm_fault *vmf,
+// 				swp_entry_t entry, struct mem_cgroup *memcg,
+// 				struct vm_area_struct *vma)
+// {
+// }
 // if PTE is not present (in swap space/disc) and the application free()s
 // it, the page fault handler is not invoked to avoid unnecesary swap
 // space disk. that is why cleaning magic bits in page fault handler only
@@ -170,10 +170,10 @@ static void mem_pattern_trace_3(int flags)
 	       );
 
 	// for use in miscellaneous experiments
-	if (flags & TRACE_MISC) {
-		fastswap_bench();
-		return;
-	}
+	// if (flags & TRACE_MISC) {
+	// 	fastswap_bench();
+	// 	return;
+	// }
 
 	if (flags & TRACE_START) {
 		mem_pattern_trace_start(flags);
@@ -194,7 +194,7 @@ static void mem_pattern_trace_3(int flags)
 	}
 }
 
-static void print_memtrace_flags()
+static void print_memtrace_flags(void)
 {
 	printk(KERN_INFO "memtrace global flags:\n"
 			 "%-30s %d (%s)\n"
@@ -215,7 +215,7 @@ static void print_memtrace_flags()
 		"Microset size", us_size, "us_size",
 		"Single tape in multicore", memtrace_getflag(ONE_TAPE) ? "ON" : "OFF", "one_tape",
 
-		"Fastswap", static_branch_unlikely(&frontswap_enabled_key) ? "ON" : "OFF", "fastswap",
+		"Fastswap", "OFF", "fastswap",
 		"Tape operations", memtrace_getflag(TAPE_OPS) ? "ON" : "OFF", "tape_ops",
 		"Swap SSD Optim",  memtrace_getflag(SWAP_SSD_OPTIMIZATION) ? "ON" : "OFF", "ssdopt",
 
@@ -269,8 +269,8 @@ static int __init mem_pattern_trace_init(void)
 			return 0;
 		}
 
-		*val == '1' ? static_branch_enable(&frontswap_enabled_key) :
-			      static_branch_disable(&frontswap_enabled_key);
+		// *val == '1' ? static_branch_enable(&frontswap_enabled_key) :
+		// 	      static_branch_disable(&frontswap_enabled_key);
 	} else if (strcmp(cmd, "one_tape") == 0) {
 		if (!val || (*val != '0' && *val != '1')) {
 			usage();

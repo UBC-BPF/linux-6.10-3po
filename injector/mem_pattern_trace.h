@@ -18,6 +18,8 @@ enum trace_flags {
 	OBLIVIOUS_TAG = 1 << 10,
 };
 
+void mem_pattern_trace_start(int flags);
+
 #define mem_pattern_trace 333
 
 #endif /*TRACING_H*/

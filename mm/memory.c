@@ -4374,6 +4374,7 @@ out_release:
 		put_swap_device(si);
 	return ret;
 }
+EXPORT_SYMBOL_GPL(do_swap_page_prefault_3po);
 
 
 /*

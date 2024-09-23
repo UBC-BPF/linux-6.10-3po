@@ -13,6 +13,9 @@
 #include "ring_buffer.h"
 // #include "page_buffer.h"
 
+extern int vfs_fstatat(int dfd, const char __user *filename,
+			      struct kstat *stat, int flags);
+
 typedef struct {
 	int counter;
 	int found_counter;

@@ -1,6 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/vmalloc.h>
 #include <linux/swap.h> //todo:: q:: reqired for swapops import because of SWP_MIGRATION_READ. is it ok?
+# include "../mm/swap.h" // TODO: A better way of importing the required functions?
 #include <linux/swapops.h> // for tape prefetching injection
 
 #include <linux/injections.h>
@@ -11,7 +12,13 @@
 
 #include <linux/kallsyms.h>
 
-#include <stdbool.h>
+extern struct folio *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
+		struct vm_area_struct *vma, unsigned long addr,
+		struct swap_iocb **plug);
+
+extern vm_fault_t do_swap_page_prefault_3po(struct vm_fault *vmf);
+
+// #include <stdbool.h>
 
 #define OBL_MAX_PRINT_LEN 768
 static const int FOOTSTEPPING_JUMP = 10;
@@ -33,16 +40,13 @@ static const int FETCH_OFFLOAD_CPU = 6;
 // the length of tape over which we look for pages to prefetch
 #define BATCH_LENGTH 100
 
-// exported from mm/memory.c mm/internal.h function
-int do_swap_page_prefault_3po(struct vm_fault *vmf);
-
-static struct process_state *process_state_new() {
+static struct process_state *process_state_new(void) {
 	struct process_state *proc = (struct process_state *)vmalloc(sizeof(struct process_state));
 	int i;
 	if (proc == NULL) return NULL;
 	spin_lock_init(&proc->key_page_indices_lock);
 	atomic_set(&proc->num_threads, 0);
-	for (i = 0; i < OBL_MAX_NUM_THREADS; i++) {
+	for (i = 0; i < OBL_MAX_NUM_THREADS; i++) { 
 		proc->key_page_indices[i] = 0;
 		atomic_long_set(&proc->map_intent[i], 0);
 		proc->bufs[i] = NULL;
@@ -434,7 +438,7 @@ static bool prefault_addr(unsigned long addr, struct mm_struct *mm)
 
 static bool prefetch_addr(unsigned long addr, struct mm_struct *mm)
 {
-	struct page *page;
+	struct folio *folio;
 	bool allocated = false;
 	struct vm_area_struct *vma;
 	pmd_t *pmd;
@@ -470,21 +474,29 @@ static bool prefetch_addr(unsigned long addr, struct mm_struct *mm)
 	// 2) we do not stall the kernel trying to evict things from our prefetched list that we are sure it is not
 	// going to succeed.
 
-	page = __read_swap_cache_async(rmem_entry, GFP_HIGHUSER_MOVABLE, vma,
-				       addr, &allocated);
-	if (!page)
+	// Note: Currently, I am replacing __read_swap_cache_async with read_swap_cache_async, 
+	// which takes similar parameters as the old function used in original 3PO implementation.
+	// However, that function also calls swap_read_folio, probably making the next few lines redundant.
+	// Will remove them later	
+	folio = read_swap_cache_async(rmem_entry, GFP_HIGHUSER_MOVABLE, vma,
+				       addr, NULL);
+	if (!folio)
 		return false;
 
 	if (!allocated) {
-		put_page(page); //= page_cache_release
+		// put_page(page); //= page_cache_release
+		folio_put(folio);
 		return false;
 	}
-	swap_readpage(page);
-	SetPageReadahead(page);
+	// swap_readpage(page);
+	swap_read_folio(folio, false, NULL); // false, NULL set based on mm/memory.c:3887
+	// SetPageReadahead(page);
+	folio_set_readahead(folio);
 	if (memtrace_getflag(MARK_UNEVICTABLE))
-		SetPageUnevictable(page);
+		// SetPageUnevictable(page);
+		folio_set_unevictable(folio);
 
-	put_page(page); //= page_cache_release
+	folio_put(folio); //= page_cache_release
 
 	return true;
 }

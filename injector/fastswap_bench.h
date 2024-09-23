@@ -2,7 +2,7 @@
 #define FASTSWAP_BENCH_H
 
 #include <linux/vmalloc.h>
-#include <linux/frontswap.h>
+// #include <linux/frontswap.h>
 #include <linux/pagemap.h>
 #include <linux/time.h>
 #include <linux/delay.h>
