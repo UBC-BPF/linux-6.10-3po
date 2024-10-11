@@ -1,5 +1,5 @@
 #!/bin/bash
-OBL_DIR="/mydata/oblivious"
+OBL_DIR="/home/tanyapsd/workspace/linux-6.10-3p"
 #NIC_DEVICE="mlx5_3"
 NIC_DEVICE="mlx5_1"
 #NIC_DEVICE="mlx4_0"
@@ -61,7 +61,7 @@ function echoR() {
 }
 function usage() {
     echo "sudo ./benchmark.sh experiment_name num_pages program_invocation"
-    echo "e.g. sudo GOMP_CPU_AFFINITY="1-2" OMP_SCHEDULE=static OMP_NUM_THREADS=2 ./benchmark.sh test 134000 ./cpp/mmult_eigen_par 42 4096 mat"
+    echo "e.g. sudo GOMP_CPU_AFFINITY="1-2" OMP_SCHEDULE=static OMP_NUM_THREADS=2 ./benchmark.sh test 134000 ./cpp/mmult_eigen_par 42 4096 ma
     echo
     echo
 }
@@ -108,8 +108,8 @@ function ftrace_end {
 	    SWAP_CACHE_READ_TIME=$(cat trace_stat/function$p | grep __read_swap_cache_async | awk -F' ' '{print $3}')
 	    BUMP_NEXT_FETCH_TIME=$(cat trace_stat/function$p | grep bump_next_fetch | awk -F' ' '{print $3}')
 
-	    FTRACE_RESULTS_HEADER="RATIO,CPU,PAGE_FAULT_HIT,PAGE_FAULT_TIME,PAGE_FAULT_S2,SWAPIN_HIT,SWAPIN_TIME,SWAPIN_S2,EVICT_HIT,EVICT_TIME,EVICT_S2,SYNC_TIME,LOCK_MINPF_HIT,LOCK_MINPF_TIME,LOCK_MINPF_S2,3PO_PF_HIT,3PO_PF_TIME,3PO_PF_S2,PREFETCH_TIME,SWAP_CACHE_READ_TIME,BUMP_NEXT_FETCH_TIME"
-	    FTRACE_RESULTS_ARR+=("$1,$p,$PAGE_FAULT_HIT,$PAGE_FAULT_TIME,$PAGE_FAULT_S2,$SWAPIN_HIT,$SWAPIN_TIME,$SWAPIN_S2,$EVICT_HIT,$EVICT_TIME,$EVICT_S2,$SYNC_TIME,$LOCK_MINPF_HIT,$LOCK_MINPF_TIME,$LOCK_MINPF_S2,$TPO_PF_HIT,$TPO_PF_TIME,$TPO_PF_S2,$PREFETCH_TIME,$SWAP_CACHE_READ_TIME,$BUMP_NEXT_FETCH_TIME")
+	    FTRACE_RESULTS_HEADER="RATIO,CPU,PAGE_FAULT_HIT,PAGE_FAULT_TIME,PAGE_FAULT_S2,SWAPIN_HIT,SWAPIN_TIME,SWAPIN_S2,EVICT_HIT,EVICT_TI
+	    FTRACE_RESULTS_ARR+=("$1,$p,$PAGE_FAULT_HIT,$PAGE_FAULT_TIME,$PAGE_FAULT_S2,$SWAPIN_HIT,$SWAPIN_TIME,$SWAPIN_S2,$EVICT_HIT,$EVICT
 
 	    echoG "#### PROCESSOR $p TRACE"
 	    cat trace_stat/function$p
@@ -294,7 +294,7 @@ if [ ! -f "/data/traces/$PROGRAM_NAME/main.bin.0" ]; then
 		popd
 		mkdir -p /data/traces/$PROGRAM_NAME
 		GOMP_CPU_AFFINITY="1" OMP_SCHEDULE=static taskset -c 1 $PROGRAM_INVOCATION
-		$PYTHON $OBL_DIR/tracer/postprocess.py /data/traces/$PROGRAM_NAME/main.bin $PROGRAM_REQUESTED_NUM_PAGES $POSTPROCESS_FETCH_BATCH_SIZE
+		$PYTHON $OBL_DIR/tracer/postprocess.py /data/traces/$PROGRAM_NAME/main.bin $PROGRAM_REQUESTED_NUM_PAGES $POSTPROCESS_FETCH_BA
 	fi
 fi
 
@@ -302,7 +302,7 @@ fi
 if [ ! -f "/data/traces/$PROGRAM_NAME/${RATIOS_ARR[0]}/main.tape.0" ]; then
 	read -p "It seems a raw trace exists but not a postprocessed one. Would you like to postprocess it? [y/n]" yn
 	if [[ $yn == "y" ]]; then
-		$PYTHON $OBL_DIR/tracer/postprocess.py /data/traces/$PROGRAM_NAME/main.bin $PROGRAM_REQUESTED_NUM_PAGES $POSTPROCESS_FETCH_BATCH_SIZE
+		$PYTHON $OBL_DIR/tracer/postprocess.py /data/traces/$PROGRAM_NAME/main.bin $PROGRAM_REQUESTED_NUM_PAGES $POSTPROCESS_FETCH_BA
 	fi
 fi
 
