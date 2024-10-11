@@ -1,5 +1,5 @@
 #!/bin/bash
-OBL_DIR="/home/tanyapsd/workspace/linux-6.10-github"
+OBL_DIR="../"
 #NIC_DEVICE="mlx5_3"
 NIC_DEVICE="mlx5_1"
 #NIC_DEVICE="mlx4_0"
@@ -61,7 +61,7 @@ function echoR() {
 }
 function usage() {
     echo "sudo ./benchmark.sh experiment_name num_pages program_invocation"
-    echo "e.g. sudo GOMP_CPU_AFFINITY="1-2" OMP_SCHEDULE=static OMP_NUM_THREADS=2 ./benchmark.sh test 134000 ./cpp/mmult_eigen_par 42 4096 ma
+    echo "e.g. sudo GOMP_CPU_AFFINITY="1-2" OMP_SCHEDULE=static OMP_NUM_THREADS=2 ./benchmark.sh test 134000 ./cpp/mmult_eigen_par 42 4096 mat"
     echo
     echo
 }
