@@ -20,6 +20,6 @@ enum trace_flags {
 
 void mem_pattern_trace_start(int flags);
 
-#define mem_pattern_trace 333
+#define mem_pattern_trace 463
 
 #endif /*TRACING_H*/

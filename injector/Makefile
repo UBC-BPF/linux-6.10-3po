@@ -6,7 +6,7 @@ mem_pattern_trace-objs += evict.o #kevictd.o
 mem_pattern_trace-objs += module_entry.o
 
 all:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
+	make -C /lib/modules/6.10.0+/build M=$(PWD) modules
 
 clean:
-	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	make -C /lib/modules/6.10.0+/build M=$(PWD) clean
