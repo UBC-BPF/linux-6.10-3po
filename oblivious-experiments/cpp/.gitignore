@@ -1,0 +1,6 @@
+*
+!*.*
+!torch
+*.sw?
+!Makefile
+!eigen
