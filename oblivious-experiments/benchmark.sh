@@ -9,7 +9,7 @@ ALL_RATIOS=${RATIOS:-$ALL_RATIOS}
 APP_CPUS=`seq 0 4`
 APP_CPUS=${CPUS:-$APP_CPUS}
 POSTPROCESS_FETCH_BATCH_SIZE=50
-PYTHON="$HOME/miniconda3/bin/python"
+PYTHON="${OBL_DIR}/bin/python3"
 
 RATIOS_ARR=($ALL_RATIOS)
 if [[ ${#RATIOS_ARR[@]} = 0 ]]
@@ -313,107 +313,107 @@ fi
 pushd $OBL_DIR/injector
 ./cli.sh tape_ops 0
 ./cli.sh ssdopt 0
-#./cli.sh async_writes 0
+./cli.sh async_writes 0
 popd
 
-#echoG ">>> Experiments with single-page swap-ins"
-#echo 0 > /proc/sys/vm/page-cluster
-#run_experiment $ALL_RATIOS
-#
-#report_results
-#reset_results
-
-#EXPERIMENT_TYPE="linux_prefetching"
-#echoG ">>> Experiments with 8page swapins"
-#echo 3 > /proc/sys/vm/page-cluster
-#run_experiment $ALL_RATIOS
-
-#report_results
-#reset_results
-
-EXPERIMENT_TYPE="linux_prefetching_asyncwrites"
-pushd $OBL_DIR/injector
-./cli.sh async_writes 1
-popd
-echoG ">>> Experiments with 8page swapins, async writes"
-echo 3 > /proc/sys/vm/page-cluster
+echoG ">>> Experiments with single-page swap-ins"
+echo 0 > /proc/sys/vm/page-cluster
 run_experiment $ALL_RATIOS
 
 report_results
 reset_results
 
-#EXPERIMENT_TYPE="linux_prefetching_ssdopt"
-#echoG ">>> Experiments with swap write path SSD optimization"
-#pushd $OBL_DIR/injector
-#./cli.sh tape_ops 0
-#./cli.sh ssdopt 1
-#./cli.sh async_writes 0
-#popd
-#
-#echo 3 > /proc/sys/vm/page-cluster
-#run_experiment $ALL_RATIOS
-#
-#report_results
-#reset_results
-#
-#EXPERIMENT_TYPE="linux_prefetching_ssdopt_asyncwrites"
-#echoG ">>> Experiments with swap write path SSD optimization + async writes"
-#pushd $OBL_DIR/injector
-#./cli.sh tape_ops 0
-#./cli.sh ssdopt 1
-#./cli.sh async_writes 1
-#popd
-#echo 3 > /proc/sys/vm/page-cluster
-#run_experiment $ALL_RATIOS
-#
-#report_results
-#reset_results
-################################  TAPE PREFETCHING EXPERIMENTS ##############################
-# page cluster param below should not make a difference.
-echo 0 > /proc/sys/vm/page-cluster
-#EXPERIMENT_TYPE="tape_prefetching_syncwrites"
-#echoG ">>> Experiments with tape prefetching"
-#pushd $OBL_DIR/injector
-#./cli.sh tape_ops 1
-#./cli.sh ssdopt 0
-#./cli.sh async_writes 0
-#./cli.sh offload_fetch 0
-#./cli.sh unevictable 0
-#popd
-#
-#run_experiment $ALL_RATIOS
-#
-#report_results
-#reset_results
+# #EXPERIMENT_TYPE="linux_prefetching"
+# #echoG ">>> Experiments with 8page swapins"
+# #echo 3 > /proc/sys/vm/page-cluster
+# #run_experiment $ALL_RATIOS
 
-EXPERIMENT_TYPE="tape_prefetching_asyncwrites"
-echoG ">>> Experiments with tape prefetching"
-pushd $OBL_DIR/injector
-./cli.sh tape_ops 1
-./cli.sh ssdopt 1
-./cli.sh async_writes 1
-./cli.sh offload_fetch 0
-./cli.sh unevictable 0
-popd
+# #report_results
+# #reset_results
 
-run_experiment $ALL_RATIOS
+# EXPERIMENT_TYPE="linux_prefetching_asyncwrites"
+# pushd $OBL_DIR/injector
+# ./cli.sh async_writes 1
+# popd
+# echoG ">>> Experiments with 8page swapins, async writes"
+# echo 3 > /proc/sys/vm/page-cluster
+# run_experiment $ALL_RATIOS
 
-report_results
-reset_results
-echo 0 > /proc/sys/vm/page-cluster
+# report_results
+# reset_results
 
-#EXPERIMENT_TYPE="tape_prefetching_asyncwrites_offload_fetch"
-#echoG ">>> Experiments with tape prefetching"
-#pushd $OBL_DIR/injector
-#./cli.sh tape_ops 1
-#./cli.sh ssdopt 1
-#./cli.sh async_writes 1
-#./cli.sh offload_fetch 1
-#./cli.sh unevictable 1
-#popd
-#
-#run_experiment $ALL_RATIOS
-#
-#report_results
-#reset_results
-#
+# #EXPERIMENT_TYPE="linux_prefetching_ssdopt"
+# #echoG ">>> Experiments with swap write path SSD optimization"
+# #pushd $OBL_DIR/injector
+# #./cli.sh tape_ops 0
+# #./cli.sh ssdopt 1
+# #./cli.sh async_writes 0
+# #popd
+# #
+# #echo 3 > /proc/sys/vm/page-cluster
+# #run_experiment $ALL_RATIOS
+# #
+# #report_results
+# #reset_results
+# #
+# #EXPERIMENT_TYPE="linux_prefetching_ssdopt_asyncwrites"
+# #echoG ">>> Experiments with swap write path SSD optimization + async writes"
+# #pushd $OBL_DIR/injector
+# #./cli.sh tape_ops 0
+# #./cli.sh ssdopt 1
+# #./cli.sh async_writes 1
+# #popd
+# #echo 3 > /proc/sys/vm/page-cluster
+# #run_experiment $ALL_RATIOS
+# #
+# #report_results
+# #reset_results
+# ################################  TAPE PREFETCHING EXPERIMENTS ##############################
+# # page cluster param below should not make a difference.
+# echo 0 > /proc/sys/vm/page-cluster
+# #EXPERIMENT_TYPE="tape_prefetching_syncwrites"
+# #echoG ">>> Experiments with tape prefetching"
+# #pushd $OBL_DIR/injector
+# #./cli.sh tape_ops 1
+# #./cli.sh ssdopt 0
+# #./cli.sh async_writes 0
+# #./cli.sh offload_fetch 0
+# #./cli.sh unevictable 0
+# #popd
+# #
+# #run_experiment $ALL_RATIOS
+# #
+# #report_results
+# #reset_results
+
+# EXPERIMENT_TYPE="tape_prefetching_asyncwrites"
+# echoG ">>> Experiments with tape prefetching"
+# pushd $OBL_DIR/injector
+# ./cli.sh tape_ops 1
+# ./cli.sh ssdopt 1
+# ./cli.sh async_writes 1
+# ./cli.sh offload_fetch 0
+# ./cli.sh unevictable 0
+# popd
+
+# run_experiment $ALL_RATIOS
+
+# report_results
+# reset_results
+# echo 0 > /proc/sys/vm/page-cluster
+
+# #EXPERIMENT_TYPE="tape_prefetching_asyncwrites_offload_fetch"
+# #echoG ">>> Experiments with tape prefetching"
+# #pushd $OBL_DIR/injector
+# #./cli.sh tape_ops 1
+# #./cli.sh ssdopt 1
+# #./cli.sh async_writes 1
+# #./cli.sh offload_fetch 1
+# #./cli.sh unevictable 1
+# #popd
+# #
+# #run_experiment $ALL_RATIOS
+# #
+# #report_results
+# #reset_results
+# #

@@ -33,6 +33,7 @@ static unsigned long global_pos;
 
 void record_init(struct task_struct *tsk, int flags, unsigned int microset_size)
 {
+	printk("record_init\n");
 	struct trace_recording_state *record = &tsk->obl.record;
 
 	flush_tlb_all_p = (void *)kallsyms_lookup_name("flush_tlb_all");
@@ -67,6 +68,7 @@ void record_init(struct task_struct *tsk, int flags, unsigned int microset_size)
 static void drain_microset(void);
 
 static void open_trace_file(struct task_struct *tsk) {
+	printk("open_trace_file\n");
 	struct trace_recording_state *record = &tsk->obl.record;
 	char trace_filepath[FILEPATH_LEN];
 
@@ -81,11 +83,13 @@ static void open_trace_file(struct task_struct *tsk) {
 
 bool record_initialized(struct task_struct *tsk)
 {
+	printk("record_initialized\n");
 	return tsk->obl.record.accesses != NULL;
 }
 
 void record_clone(struct task_struct *p, unsigned long clone_flags)
 {
+	printk("record_clone\n");
 	if (memtrace_getflag(ONE_TAPE)) {
 		atomic_inc(&num_active_threads);
 		p->obl = current->obl;
@@ -96,6 +100,7 @@ void record_clone(struct task_struct *p, unsigned long clone_flags)
 
 void record_fini(struct task_struct *tsk)
 {
+	printk("record_fini\n");
 	struct trace_recording_state *record = &tsk->obl.record;
 
 	if (record_initialized(tsk)) {
@@ -135,6 +140,7 @@ void record_fini(struct task_struct *tsk)
 /************************** TRACE RECORDING FOR MEMORY PREFETCHING BEGIN ********************************/
 __always_inline void trace_maybe_set_pte(pte_t *pte, bool *return_early)
 {
+	printk("trace_maybe_set_pte\n");
 	unsigned long pte_deref_value;
 	*return_early = false;
 
@@ -152,6 +158,7 @@ __always_inline void trace_maybe_set_pte(pte_t *pte, bool *return_early)
 // used to unmap the last entry
 static void trace_clear_pte(pte_t *pte)
 {
+	printk("trace_clear_pte\n");
 	unsigned long pte_deref_value;
 	// if previous fault was a pmd allocation fault, we will not have pte
 	if (unlikely(pte == NULL))
@@ -169,6 +176,7 @@ static void trace_clear_pte(pte_t *pte)
 
 static void drain_microset(void)
 {
+	printk("drain_microset\n");
 	struct trace_recording_state *record = &current->obl.record;
 	unsigned long i;
 
@@ -204,6 +212,7 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 			       unsigned long address, struct task_struct *tsk,
 			       bool *return_early, int magic)
 {
+	printk("record_page_fault_handler\n");
 	struct trace_recording_state *record = &current->obl.record;
 	struct vm_area_struct *maybe_stack;
 
