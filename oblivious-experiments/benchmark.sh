@@ -310,18 +310,18 @@ fi
 #####################################  EXPERIMENTS BEGIN ########################################
 #EXPERIMENT_TYPE="no_prefetching"
 # make sure tape prefetcher is not loaded
-pushd $OBL_DIR/injector
-./cli.sh tape_ops 0
-./cli.sh ssdopt 0
-./cli.sh async_writes 0
-popd
+# pushd $OBL_DIR/injector
+# ./cli.sh tape_ops 0
+# ./cli.sh ssdopt 0
+# ./cli.sh async_writes 0
+# popd
 
-echoG ">>> Experiments with single-page swap-ins"
-echo 0 > /proc/sys/vm/page-cluster
-run_experiment $ALL_RATIOS
+# echoG ">>> Experiments with single-page swap-ins"
+# echo 0 > /proc/sys/vm/page-cluster
+# run_experiment $ALL_RATIOS
 
-report_results
-reset_results
+# report_results
+# reset_results
 
 # #EXPERIMENT_TYPE="linux_prefetching"
 # #echoG ">>> Experiments with 8page swapins"
@@ -369,22 +369,22 @@ reset_results
 # #report_results
 # #reset_results
 # ################################  TAPE PREFETCHING EXPERIMENTS ##############################
-# # page cluster param below should not make a difference.
-# echo 0 > /proc/sys/vm/page-cluster
-# #EXPERIMENT_TYPE="tape_prefetching_syncwrites"
-# #echoG ">>> Experiments with tape prefetching"
-# #pushd $OBL_DIR/injector
-# #./cli.sh tape_ops 1
-# #./cli.sh ssdopt 0
-# #./cli.sh async_writes 0
-# #./cli.sh offload_fetch 0
-# #./cli.sh unevictable 0
-# #popd
-# #
-# #run_experiment $ALL_RATIOS
-# #
-# #report_results
-# #reset_results
+# page cluster param below should not make a difference.
+echo 0 > /proc/sys/vm/page-cluster
+EXPERIMENT_TYPE="tape_prefetching_syncwrites"
+echoG ">>> Experiments with tape prefetching"
+pushd $OBL_DIR/injector
+./cli.sh tape_ops 1
+./cli.sh ssdopt 0
+./cli.sh async_writes 0
+./cli.sh offload_fetch 0
+./cli.sh unevictable 0
+popd
+
+run_experiment $ALL_RATIOS
+
+report_results
+reset_results
 
 # EXPERIMENT_TYPE="tape_prefetching_asyncwrites"
 # echoG ">>> Experiments with tape prefetching"
