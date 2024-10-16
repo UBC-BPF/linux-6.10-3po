@@ -222,8 +222,8 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 	if (unlikely(error_code & PF_INSTR)) {
 		return;
 	}
-
-	maybe_stack = lock_mm_and_find_vma(current->mm, address, regs);
+	down_read(&current->mm->mmap_lock);
+	maybe_stack = find_vma(current->mm, address, regs);
 	//maybe_stack = find_vma(current->mm, address);
 	if (unlikely(0x800000 ==
 		     maybe_stack->vm_end - maybe_stack->vm_start)) {
@@ -250,9 +250,13 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 	      maybe_stack->vm_end >= current->mm->start_brk)) {
 		return;
 	}*/
-	if (maybe_stack->vm_file) return;
+	if (maybe_stack->vm_file) {
+		up_read(&current->mm->mmap_lock);
+		return;
+	}
+	
 
-	down_read(&current->mm->mmap_lock);
+	
 
 	if (memtrace_getflag(ONE_TAPE))
 		record->microset_pos = atomic_read(&microset_pos);
