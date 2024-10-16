@@ -157,7 +157,7 @@ __always_inline void trace_maybe_set_pte(pte_t *pte, bool *return_early)
 // used to unmap the last entry
 static void trace_clear_pte(pte_t *pte)
 {
-	printk("trace_clear_pte\n");
+	// printk("trace_clear_pte\n");
 	unsigned long pte_deref_value;
 	// if previous fault was a pmd allocation fault, we will not have pte
 	if (unlikely(pte == NULL))
@@ -175,7 +175,7 @@ static void trace_clear_pte(pte_t *pte)
 
 static void drain_microset(void)
 {
-	printk("drain_microset\n");
+	// printk("drain_microset\n");
 	struct trace_recording_state *record = &current->obl.record;
 	unsigned long i;
 
@@ -211,7 +211,7 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 			       unsigned long address, struct task_struct *tsk,
 			       bool *return_early, int magic)
 {
-	printk("record_page_fault_handler\n");
+	// printk("record_page_fault_handler\n");
 	struct trace_recording_state *record = &current->obl.record;
 	struct vm_area_struct *maybe_stack;
 
