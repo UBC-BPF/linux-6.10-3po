@@ -139,7 +139,7 @@ void record_fini(struct task_struct *tsk)
 /************************** TRACE RECORDING FOR MEMORY PREFETCHING BEGIN ********************************/
 __always_inline void trace_maybe_set_pte(pte_t *pte, bool *return_early)
 {
-	printk("trace_maybe_set_pte\n");
+//	printk("trace_maybe_set_pte\n");
 	unsigned long pte_deref_value;
 	*return_early = false;
 
@@ -211,7 +211,7 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 			       unsigned long address, struct task_struct *tsk,
 			       bool *return_early, int magic)
 {
-	// printk("record_page_fault_handler\n");
+//	printk("record_page_fault_handler\n");
 	struct trace_recording_state *record = &current->obl.record;
 	struct vm_area_struct *maybe_stack;
 
@@ -223,7 +223,7 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 		return;
 	}
 	down_read(&current->mm->mmap_lock);
-	maybe_stack = find_vma(current->mm, address, regs);
+	maybe_stack = find_vma(current->mm, address);
 	//maybe_stack = find_vma(current->mm, address);
 	if (unlikely(0x800000 ==
 		     maybe_stack->vm_end - maybe_stack->vm_start)) {
@@ -245,18 +245,18 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 			return;
 		}
 	}
-
+	up_read(&current->mm->mmap_lock);
 	/*if (!(maybe_stack->vm_start <= current->mm->brk &&
 	      maybe_stack->vm_end >= current->mm->start_brk)) {
 		return;
 	}*/
 	if (maybe_stack->vm_file) {
-		up_read(&current->mm->mmap_lock);
+//		up_read(&current->mm->mmap_lock);
 		return;
 	}
 	
 
-	
+	down_read(&current->mm->mmap_lock);
 
 	if (memtrace_getflag(ONE_TAPE))
 		record->microset_pos = atomic_read(&microset_pos);
