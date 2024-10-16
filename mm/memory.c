@@ -6271,6 +6271,7 @@ fail:
 	mmap_write_unlock(mm);
 	return NULL;
 }
+EXPORT_SYMBOL(lock_mm_and_find_vma);
 #endif
 
 #ifdef CONFIG_PER_VMA_LOCK

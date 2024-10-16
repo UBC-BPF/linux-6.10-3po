@@ -3,7 +3,6 @@
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
 #include <asm/tlbflush.h>
-
 #include <linux/injections.h>
 
 #include "common.h"
@@ -224,7 +223,8 @@ void record_page_fault_handler(struct pt_regs *regs, unsigned long error_code,
 		return;
 	}
 
-	maybe_stack = find_vma(current->mm, address);
+	maybe_stack = lock_mm_and_find_vma(current->mm, address, regs);
+	//maybe_stack = find_vma(current->mm, address);
 	if (unlikely(0x800000 ==
 		     maybe_stack->vm_end - maybe_stack->vm_start)) {
 		struct vm_area_struct *next;

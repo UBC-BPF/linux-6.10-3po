@@ -1298,6 +1298,9 @@ void do_user_addr_fault(struct pt_regs *regs,
 
 	local_irq_enable();
 
+	return_early = false;
+	page_fault_handler_3po(regs, error_code, address, tsk, &return_early);
+
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, address);
 
 	/*
