@@ -167,13 +167,13 @@ function run_experiment {
 	        done
 	    fi
 	    echoG "Begin experiment with ration ratio: $ratio\tneeded total pages: $PROGRAM_REQUESTED_NUM_PAGES (found $num_tapes tapes)"
-	    if [[ $NIC_DEVICE = mlx4* ]]
-	    then
-		    # Clear performance counters, since on the Leap cluster with mlx4 it's only 32 bits
-		    perfquery -R -a
-	    fi
+	    # if [[ $NIC_DEVICE = mlx4* ]]
+	    # then
+		#     # Clear performance counters, since on the Leap cluster with mlx4 it's only 32 bits
+		#     perfquery -R -a
+	    # fi
 
-	    ps ax | grep nic_monitor | awk '{print $1}' | xargs sudo kill -9
+	    # ps ax | grep nic_monitor | awk '{print $1}' | xargs sudo kill -9
 	    cgroup_init
 	    # need to run cgroup_add in a subshell to make sure all processes of cgroup exit before next iteration
 	    # of the loop when cgroup_init tries to reset the cgroup
@@ -194,8 +194,10 @@ function run_experiment {
 	    ftrace_begin
 	    bash nic_monitor.sh > "$RESULTS_DIR/${EXPERIMENT_NAME}/$EXPERIMENT_TYPE/nic_monitor.$ratio.csv" &
 	    NIC_MONITOR=$!
-	    PAGES_SWAPPED_IN=$(cat "/sys/class/infiniband/$NIC_DEVICE/ports/1/counters/port_rcv_data")
-	    PAGES_SWAPPED_OUT=$(cat "/sys/class/infiniband/$NIC_DEVICE/ports/1/counters/port_xmit_data")
+	    # PAGES_SWAPPED_IN=$(cat "/sys/class/infiniband/$NIC_DEVICE/ports/1/counters/port_rcv_data")
+	    # PAGES_SWAPPED_OUT=$(cat "/sys/class/infiniband/$NIC_DEVICE/ports/1/counters/port_xmit_data")
+		PAGES_SWAPPED_IN=$(cat /proc/vmstat | grep -E 'pswpin' | awk '{print $2}')
+	    PAGES_SWAPPED_OUT=$(cat /proc/vmstat | grep -E 'pswpout' | awk '{print $2}')
 	    RUN_TIME=$(
 	    #subshell BEGIN
 	    # \/ uncomment the line below if youd like to add the current process (INCLUDING THE BASH SHELL) to the cgroup
@@ -207,10 +209,12 @@ function run_experiment {
 	    echo "$RUN_TIME" # becomes out of the subshell and is communicated back to the parent
 	    #subshell END
 	    )
-	    kill -9 $NIC_MONITOR
-	    PAGES_SWAPPED_IN_FINAL=$(cat "/sys/class/infiniband/$NIC_DEVICE/ports/1/counters/port_rcv_data")
-	    PAGES_SWAPPED_OUT_FINAL=$(cat "/sys/class/infiniband/$NIC_DEVICE/ports/1/counters/port_xmit_data")
-	    PAGES_SWAPPED_IN=$(((${PAGES_SWAPPED_IN_FINAL}-${PAGES_SWAPPED_IN}) * 4 / 4096))
+	    # kill -9 $NIC_MONITOR
+	    # PAGES_SWAPPED_IN_FINAL=$(cat "/sys/class/infiniband/$NIC_DEVICE/ports/1/counters/port_rcv_data")
+	    # PAGES_SWAPPED_OUT_FINAL=$(cat "/sys/class/infiniband/$NIC_DEVICE/ports/1/counters/port_xmit_data")
+	    PAGES_SWAPPED_IN_FINAL=$(cat /proc/vmstat | grep -E 'pswpin' | awk '{print $2}')
+	    PAGES_SWAPPED_OUT_FINAL=$(cat /proc/vmstat | grep -E 'pswpout' | awk '{print $2}')
+		PAGES_SWAPPED_IN=$(((${PAGES_SWAPPED_IN_FINAL}-${PAGES_SWAPPED_IN}) * 4 / 4096))
 	    PAGES_SWAPPED_OUT=$(((${PAGES_SWAPPED_OUT_FINAL}-${PAGES_SWAPPED_OUT}) * 4 / 4096))
 	    if [[ $PAGES_SWAPPED_IN_FINAL = $((0xFFFFFFFF)) ]]
 	    then
